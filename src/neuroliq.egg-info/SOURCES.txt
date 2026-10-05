@@ -1,9 +1,0 @@
-README.md
-pyproject.toml
-src/neuroliq/__init__.py
-src/neuroliq.egg-info/PKG-INFO
-src/neuroliq.egg-info/SOURCES.txt
-src/neuroliq.egg-info/dependency_links.txt
-src/neuroliq.egg-info/requires.txt
-src/neuroliq.egg-info/top_level.txt
-tests/test_package.py
