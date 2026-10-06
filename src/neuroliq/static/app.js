@@ -19,6 +19,25 @@ async function loadGraph() {
     const response = await fetch("/api/graph", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const graph = await response.json();
+    let started = false;
+    let state;
+    const seedControls = document.getElementById("seeds");
+    for (const [index, concept] of graph.concepts.entries()) {
+      const row = document.createElement("label");
+      const enabled = document.createElement("input");
+      enabled.type = "checkbox";
+      enabled.checked = index < 2;
+      enabled.dataset.id = concept.id;
+      enabled.setAttribute("aria-label", `Seed ${concept.label}`);
+      const value = document.createElement("input");
+      value.type = "number";
+      value.min = "0";
+      value.step = "0.1";
+      value.value = "1";
+      value.setAttribute("aria-label", `Activation ${concept.label}`);
+      row.append(enabled, textElement("span", concept.label), value);
+      seedControls.append(row);
+    }
     const concepts = new Map(graph.concepts.map(concept => [concept.id, concept]));
     const cy = cytoscape({
       container: document.getElementById("graph"),
@@ -39,6 +58,7 @@ async function loadGraph() {
           "width": 42, "height": 42, "color": "#243547",
           "text-valign": "bottom", "text-margin-y": 10, "font-size": 16
         } },
+        { selector: "node[activation > 0]", style: { "background-color": "#df8a22", "label": "data(displayLabel)" } },
         { selector: "edge", style: {
           "width": 2, "line-color": "#8a9eb2", "curve-style": "bezier"
         } },
@@ -52,8 +72,7 @@ async function loadGraph() {
     fit.disabled = false;
     fit.addEventListener("click", () => cy.fit(undefined, 70));
 
-    cy.on("select", "node, edge", event => {
-      const element = event.target;
+    function showDetails(element) {
       const data = element.data();
       details.replaceChildren(textElement("h3", element.isNode() ? "Концепт" : "Связь"));
       const list = document.createElement("dl");
@@ -61,6 +80,7 @@ async function loadGraph() {
       if (element.isNode()) {
         field(list, "ID", data.id);
         field(list, "Метка", data.label);
+        field(list, "Текущая activation", String(data.activation || 0));
         details.append(textElement("h3", `Соседи (${data.neighbors.length})`));
         if (!data.neighbors.length) details.append(textElement("p", "Нет соседей — изолированный концепт."));
         const neighbors = document.createElement("ul");
@@ -76,7 +96,79 @@ async function loadGraph() {
         }
         field(list, "strength", String(data.strength));
       }
+    }
+    cy.on("select", "node, edge", event => showDetails(event.target));
+
+    async function request(command, body) {
+      const response = await fetch(`/api/activation/${command}`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(JSON.stringify(result.detail));
+      return result;
+    }
+    function display(result) {
+      state = result;
+      cy.nodes().forEach(node => {
+        const activation = state.activation[node.id()] || 0;
+        node.data({ activation, displayLabel: `${node.data("label")} · ${activation}` });
+      });
+      document.getElementById("activation-status").textContent = state.step < 0
+        ? "Временное состояние сброшено"
+        : `Шаг ${state.step} / ${state.parameters.max_steps}`;
+      document.getElementById("trace").textContent = state.trace
+        ? JSON.stringify(state.trace, null, 2) : "Нет временного состояния";
+      const selected = cy.$(":selected");
+      if (selected.length) showDetails(selected[0]);
+    }
+    document.querySelectorAll("#seeds input, .parameters input").forEach(input => {
+      input.addEventListener("input", () => {
+        started = false;
+        document.getElementById("activation-status").textContent = "Параметры изменены — следующая команда начнёт новый запуск";
+      });
     });
+    const buttons = ["reset", "step", "run"].map(id => document.getElementById(id));
+    for (const button of buttons) {
+      button.addEventListener("click", async () => {
+        buttons.forEach(item => { item.disabled = true; });
+        document.querySelectorAll("aside input").forEach(input => { input.disabled = true; });
+        try {
+          if (button.id === "reset") {
+            display(await request("reset"));
+            started = false;
+          } else {
+            if (!started) {
+              const seeds = {};
+              for (const row of seedControls.children) {
+                if (row.children[0].checked) seeds[row.children[0].dataset.id] = Number(row.children[2].value);
+              }
+              display(await request("start", {
+                seeds, decay: Number(document.getElementById("decay").value),
+                max_active: Number(document.getElementById("max-active").value),
+                max_steps: Number(document.getElementById("max-steps").value)
+              }));
+              started = true;
+            }
+            display(await request(button.id));
+          }
+        } catch (error) {
+          document.getElementById("activation-status").textContent = `Ошибка: ${error.message}`;
+        } finally {
+          buttons.forEach(item => { item.disabled = false; });
+          document.querySelectorAll("aside input").forEach(input => { input.disabled = false; });
+        }
+      });
+    }
+    const initial = await fetch("/api/activation");
+    if (!initial.ok) throw new Error(`HTTP ${initial.status}`);
+    const initialState = await initial.json();
+    display(initialState);
+    if (initialState.parameters) {
+      document.getElementById("activation-status").textContent += " · следующий запуск использует параметры формы";
+    }
+    cy.resize();
+    cy.fit(undefined, 70);
     cy.on("tap", event => {
       if (event.target === cy) details.replaceChildren(textElement("p", "Выберите концепт или связь на графе."));
     });
