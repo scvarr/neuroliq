@@ -1,6 +1,6 @@
 # Текущее состояние
 
-Этап: M4 принят; M4.1 — инструментальная подготовка к M5, единый Docker-запускаемый Neuroliq Graph Lab. Roadmap M0–M8 не изменён.
+Этап: M5.1 выполнен — ограниченная проверка периодического эха на графе M4; стенд M4.1 — единый Docker-запускаемый Neuroliq Graph Lab. Roadmap M0–M8 не изменён.
 
 - Core M1 (`Graph`, `Concept`, `Connection`) и математика Activation M2 не изменены. Концепт содержит только UUID; связи нетипизированные, технически неориентированные. Self-loop и дубликаты запрещены.
 - Введён отдельный `ExperimentDefinition`: версия JSON, title, концепты с UUID и внешними labels, connections/strength, seeds и параметры. Loader валидирует документ и сохраняет идентичность UUID; save/load возвращает эквивалентное описание. Runtime/trace в файл не входят.
@@ -10,7 +10,8 @@
 - M3/M4 перенесены в `experiments/m3-simple-retrieval.neuroliq.json` и `experiments/m4-two-step-bridge.neuroliq.json` с прежними UUID, топологией, силами и параметрами. Отдельные M3/M4 fixtures/apps удалены; M1/M2 fixtures сохранены для тестов и диагностики.
 - M3: 5 концептов, 4 strength=1.0; decay=0.5, max_active=5, max_steps=1. Одиночные СТОЛИЦА/ФРАНЦИЯ дают ничьи ПАРИЖ=0.5 с ЛОНДОНОМ/ЛИОНОМ; совместные дают ПАРИЖ=1.0 против 0.5 через два вклада.
 - M4: A—C—X—D—B, C—E, D—F; 7 концептов, 6 strength=1.0; decay=0.5, max_active=7, max_steps=2. Одиночные A/B дают ничью X=0.25; совместные дают X=0.5 против 0.25 через C→X/D→X. Возвраты к seeds сохранены; pruning отсутствует.
-- Исследовательские выводы сохранены: [M2](m2-experiment.md), [M3](m3-experiment.md), [M4](m4-experiment.md). Подтверждены только контролируемые структурные пересечения. Маршрутизация, retention/context memory, обучение, языковой слой, MCP и LLM отсутствуют; критерий всего первого исследовательского цикла не выполнен.
+- M5.1: `experiments/m5-1-backwave-echo.neuroliq.json` сохраняет структуру/UUID/strength M4, seeds A=B=1.0, decay=0.5, max_active=7; max_steps=6. Неизменный Activation M2 даёт C=D=0.5 на шагах 1/3/5 и X=0.5, A=B=E=F=0.25 на 2/4/6: обратные contributions восстанавливают период 2 без затухания фаз. Полный trace, численное объяснение и 3 прошедших targeted tests: [M5.1](m5-1-experiment.md). Решения M5.2+ не принимались.
+- Исследовательские выводы сохранены: [M2](m2-experiment.md), [M3](m3-experiment.md), [M4](m4-experiment.md), [M5.1](m5-1-experiment.md). Подтверждены контролируемые структурные пересечения и периодическое эхо на графе M4 при параметрах M5.1. Маршрутизация, retention/context memory, обучение, языковой слой, MCP и LLM отсутствуют; критерий всего первого исследовательского цикла не выполнен.
 
 Запуск из корня:
 
