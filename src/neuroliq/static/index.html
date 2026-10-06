@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Neuroliq — наблюдатель активации M2</title>
+  <title>Neuroliq — наблюдатель активации</title>
   <link rel="stylesheet" href="/static/style.css">
   <script defer src="/static/vendor/cytoscape.min.js"></script>
   <script defer src="/static/app.js"></script>
 </head>
 <body>
   <header>
-    <div><h1>Neuroliq <span>Активация M2</span></h1><p>Временная волна · постоянный граф только читается</p></div>
+    <div><h1>Neuroliq <span id="experiment-title">Активация</span></h1><p>Временная волна · постоянный граф только читается</p></div>
     <div class="toolbar"><p id="counts" role="status">Загрузка графа…</p><button id="fit" disabled>Вписать граф</button></div>
   </header>
   <main>
@@ -19,7 +19,9 @@
       <p class="hint">Колесо — масштаб · фон — перемещение · узел — перетаскивание</p>
     </section>
     <aside aria-label="Сведения о выбранном элементе">
-      <h2>Запуск M2</h2>
+      <h2>Запуск</h2>
+      <div id="scenarios" class="commands" aria-label="Контролируемые сценарии"></div>
+      <p id="scenario-status" role="status"></p>
       <p>Seeds: отметьте концепты и задайте activation. Изменение параметров начинает новую волну при следующей команде.</p>
       <div id="seeds"></div>
       <div class="parameters">
@@ -29,6 +31,11 @@
       </div>
       <div class="commands"><button id="reset">Сброс</button><button id="step">Шаг</button><button id="run">Выполнить</button></div>
       <p id="activation-status" role="status"></p>
+      <h2>Ранжирование кандидатов</h2>
+      <p>Одинаковая activation означает ничью; порядок UUID не определяет уникального лидера.</p>
+      <table><thead><tr><th>Концепт</th><th>activation</th><th>Состояние</th></tr></thead><tbody id="ranking"></tbody></table>
+      <h2>Вклады текущего шага</h2>
+      <table><thead><tr><th>Переход</th><th>Множители</th><th>Вклад</th></tr></thead><tbody id="contributions"></tbody></table>
       <h2>Выбранный элемент</h2>
       <div id="details" aria-live="polite"><p>Выберите концепт или связь на графе.</p></div>
       <h2>Trace текущего шага</h2><pre id="trace">Нет временного состояния</pre><p class="note">Метки внешние. Связи неориентированные. Число strength показано без семантической интерпретации.</p>

@@ -19,6 +19,17 @@ async function loadGraph() {
     const response = await fetch("/api/graph", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const graph = await response.json();
+    const configResponse = await fetch("/api/experiment", { cache: "no-store" });
+    if (!configResponse.ok) throw new Error(`HTTP ${configResponse.status}`);
+    const config = await configResponse.json();
+    document.getElementById("experiment-title").textContent = config.title;
+    document.title = `Neuroliq — ${config.title}`;
+    function setParameters(parameters) {
+      document.getElementById("decay").value = parameters.decay;
+      document.getElementById("max-active").value = parameters.max_active;
+      document.getElementById("max-steps").value = parameters.max_steps;
+    }
+    setParameters(config.parameters);
     let started = false;
     let state;
     const seedControls = document.getElementById("seeds");
@@ -119,19 +130,54 @@ async function loadGraph() {
         : `Шаг ${state.step} / ${state.parameters.max_steps}`;
       document.getElementById("trace").textContent = state.trace
         ? JSON.stringify(state.trace, null, 2) : "Нет временного состояния";
+      const ranking = document.getElementById("ranking");
+      ranking.replaceChildren();
+      for (const candidate of state.trace?.candidates || []) {
+        const row = document.createElement("tr");
+        row.append(textElement("td", concepts.get(candidate.id).label),
+          textElement("td", String(candidate.activation)),
+          textElement("td", candidate.kept ? "Сохранён" : "Отсечён"));
+        ranking.append(row);
+      }
+      const contributions = document.getElementById("contributions");
+      contributions.replaceChildren();
+      for (const transition of state.trace?.transitions || []) {
+        const row = document.createElement("tr");
+        row.append(textElement("td", `${concepts.get(transition.source).label} → ${concepts.get(transition.target).label}`),
+          textElement("td", `${transition.source_activation} × ${transition.strength} × ${transition.decay}`),
+          textElement("td", String(transition.contribution)));
+        contributions.append(row);
+      }
       const selected = cy.$(":selected");
       if (selected.length) showDetails(selected[0]);
     }
     document.querySelectorAll("#seeds input, .parameters input").forEach(input => {
       input.addEventListener("input", () => {
         started = false;
+        document.getElementById("scenario-status").textContent = "Ручные параметры";
         document.getElementById("activation-status").textContent = "Параметры изменены — следующая команда начнёт новый запуск";
       });
     });
     const buttons = ["reset", "step", "run"].map(id => document.getElementById(id));
+    const scenarioButtons = config.scenarios.map(scenario => {
+      const button = textElement("button", scenario.name);
+      button.addEventListener("click", () => {
+        for (const row of seedControls.children) {
+          const id = row.children[0].dataset.id;
+          row.children[0].checked = Object.hasOwn(scenario.seeds, id);
+          row.children[2].value = scenario.seeds[id] ?? 1;
+        }
+        setParameters(config.parameters);
+        started = false;
+        document.getElementById("scenario-status").textContent = `Сценарий: ${scenario.name}`;
+        document.getElementById("run").click();
+      });
+      document.getElementById("scenarios").append(button);
+      return button;
+    });
     for (const button of buttons) {
       button.addEventListener("click", async () => {
-        buttons.forEach(item => { item.disabled = true; });
+        [...buttons, ...scenarioButtons].forEach(item => { item.disabled = true; });
         document.querySelectorAll("aside input").forEach(input => { input.disabled = true; });
         try {
           if (button.id === "reset") {
@@ -155,7 +201,7 @@ async function loadGraph() {
         } catch (error) {
           document.getElementById("activation-status").textContent = `Ошибка: ${error.message}`;
         } finally {
-          buttons.forEach(item => { item.disabled = false; });
+          [...buttons, ...scenarioButtons].forEach(item => { item.disabled = false; });
           document.querySelectorAll("aside input").forEach(input => { input.disabled = false; });
         }
       });

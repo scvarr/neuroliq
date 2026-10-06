@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .activation import Activation
 from .m2_fixture import build_m2_fixture
+from .m3_fixture import build_m3_fixture, observer_config
 from .graph import ConceptId, Graph
 
 
@@ -46,12 +47,21 @@ class StartRequest(BaseModel):
     max_active: int = Field(ge=1, strict=True)
 
 
-def create_app(graph: Graph, labels: Mapping[ConceptId, str]) -> FastAPI:
+def create_app(graph: Graph, labels: Mapping[ConceptId, str], *,
+               experiment_config: dict | None = None) -> FastAPI:
     """Общий локальный runtime приложения; постоянный граф только читается."""
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     static = Path(__file__).with_name("static")
     runtime = Activation(graph)
     lock = Lock()
+
+    @app.get("/api/experiment")
+    def get_experiment() -> dict:
+        return experiment_config if experiment_config is not None else {
+            "title": "Активация M2",
+            "parameters": dict(decay=0.5, max_active=2, max_steps=3),
+            "scenarios": [],
+        }
 
     @app.get("/api/activation")
     def get_activation() -> dict:
@@ -92,3 +102,4 @@ def create_app(graph: Graph, labels: Mapping[ConceptId, str]) -> FastAPI:
 
 
 app = create_app(*build_m2_fixture())
+m3_app = create_app(*build_m3_fixture(), experiment_config=observer_config())

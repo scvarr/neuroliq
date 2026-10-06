@@ -31,10 +31,12 @@ small { display: block; color: #617487; }
 }
 
 #seeds label { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
-#seeds span { width: 40px; }
+#seeds span { min-width: 100px; }
 input[type=number] { width: 90px; padding: 6px; font: inherit; }
 .parameters { display: flex; gap: 12px; flex-wrap: wrap; margin: 18px 0; }
 .parameters label { display: flex; flex-direction: column; gap: 5px; }
 .commands { display: flex; gap: 8px; flex-wrap: wrap; }
 pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; background: #f3f6fa; padding: 12px; }
 aside h2 { margin-top: 24px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; border-bottom: 1px solid #d9e2ec; padding: 8px 4px; }
