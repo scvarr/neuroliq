@@ -5,8 +5,40 @@ from fastapi.testclient import TestClient
 
 from neuroliq.activation import Activation
 from neuroliq.graph import Graph
-from neuroliq.m3_fixture import build_m3_fixture, experiment, observer_config
+from pathlib import Path
+
+from neuroliq.experiment import ExperimentDefinition
 from neuroliq.web import create_app
+
+EXPERIMENT = Path(__file__).resolve().parents[1] / "experiments/m3-simple-retrieval.neuroliq.json"
+
+
+def load_m3_graph():
+    return ExperimentDefinition.load(EXPERIMENT).build()
+
+
+def scenario_config():
+    definition = ExperimentDefinition.load(EXPERIMENT)
+    ids = list(definition.run.seeds)
+    graph, labels = definition.build()
+    return {"parameters": definition.run.model_dump(exclude={"seeds"}),
+            "scenarios": [{"name": " + ".join(labels[cid] for cid in selected),
+                           "seeds": {str(cid): 1.0 for cid in selected}}
+                          for selected in ([ids[0]], [ids[1]], ids)]}
+
+
+def experiment():
+    definition = ExperimentDefinition.load(EXPERIMENT)
+    graph, labels = definition.build()
+    runtime = Activation(graph)
+    runs = []
+    for scenario in scenario_config()["scenarios"]:
+        runtime.start({UUID(cid): value for cid, value in scenario["seeds"].items()},
+                      **scenario_config()["parameters"])
+        runtime.run()
+        runs.append({"name": scenario["name"], **runtime.snapshot()})
+    return {"labels": {str(cid): label for cid, label in labels.items()}, "runs": runs}
+
 
 
 def structure(graph):
@@ -14,8 +46,8 @@ def structure(graph):
             tuple((c.id, graph.neighbors(c.id)) for c in graph.concepts()))
 
 
-def test_fixture_has_exact_structure_and_equal_strength():
-    graph, labels = build_m3_fixture()
+def test_file_has_exact_structure_and_equal_strength():
+    graph, labels = load_m3_graph()
     assert labels == dict(zip((UUID(int=i) for i in range(201, 206)),
                              ("СТОЛИЦА", "ФРАНЦИЯ", "ПАРИЖ", "ЛОНДОН", "ЛИОН")))
     assert {c.id for c in graph.concepts()} == set(labels)
@@ -61,7 +93,7 @@ def test_three_runs_ties_unique_leader_and_only_two_contributions():
 def test_determinism_graph_unchanged_and_labels_do_not_affect_activation():
     expected = experiment()
     assert experiment() == expected
-    graph, labels = build_m3_fixture()
+    graph, labels = load_m3_graph()
     reverse = Graph()
     for c in reversed(graph.concepts()):
         reverse.create_concept(c.id)
@@ -71,9 +103,9 @@ def test_determinism_graph_unchanged_and_labels_do_not_affect_activation():
         before = structure(tested)
         runtime = Activation(tested)
         labels.clear()
-        for scenario, run in zip(observer_config()["scenarios"], expected["runs"], strict=True):
+        for scenario, run in zip(scenario_config()["scenarios"], expected["runs"], strict=True):
             runtime.start({UUID(cid): value for cid, value in reversed(list(scenario["seeds"].items()))},
-                          **observer_config()["parameters"])
+                          **scenario_config()["parameters"])
             runtime.run()
             runtime.step()
             assert runtime.snapshot() == {key: value for key, value in run.items() if key != "name"}
@@ -82,20 +114,16 @@ def test_determinism_graph_unchanged_and_labels_do_not_affect_activation():
             assert structure(tested) == before
 
 
-def test_web_reproduces_all_scenarios_on_one_unchanged_graph():
-    graph, labels = build_m3_fixture()
-    before = structure(graph)
-    config = observer_config()
-    with TestClient(create_app(graph, labels, experiment_config=config)) as client:
-        assert client.get("/api/experiment").json() == config
-        projection = client.get("/api/graph").json()
-        for scenario, run in zip(config["scenarios"], experiment()["runs"], strict=True):
-            response = client.post("/api/activation/start", json={**config["parameters"], "seeds": scenario["seeds"]})
-            assert response.status_code == 200
-            assert response.json()["step"] == 0
+def test_web_reproduces_all_scenarios_from_file():
+    definition = ExperimentDefinition.load(EXPERIMENT)
+    with TestClient(create_app()) as client:
+        for scenario, run in zip(scenario_config()["scenarios"], experiment()["runs"], strict=True):
+            data = definition.model_dump(mode="json")
+            data["run"]["seeds"] = scenario["seeds"]
+            assert client.put("/api/experiment", json=data).status_code == 200
+            projection = client.get("/api/graph").json()
             response = client.post("/api/activation/run")
             assert response.status_code == 200
             assert response.json() == {key: value for key, value in run.items() if key != "name"}
             assert client.get("/api/graph").json() == projection
         assert client.post("/api/activation/reset").json()["activation"] == {}
-    assert structure(graph) == before

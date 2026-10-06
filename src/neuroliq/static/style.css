@@ -40,3 +40,10 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; backgroun
 aside h2 { margin-top: 24px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { text-align: left; border-bottom: 1px solid #d9e2ec; padding: 8px 4px; }
+
+.editor-row { padding: 12px 0; border-bottom: 1px solid #d9e2ec; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.editor-row small { flex-basis: 100%; overflow-wrap: anywhere; font-size: 11px; }
+input:not([type=checkbox]), select, textarea { max-width: 100%; padding: 6px; font: inherit; }
+textarea { width: 100%; font-size: 12px; }
+.commands, details { margin: 12px 0; }
+#status { white-space: pre-wrap; overflow-wrap: anywhere; }

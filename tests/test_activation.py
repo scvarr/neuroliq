@@ -120,26 +120,22 @@ def test_invalid_seeds_and_overflow_are_atomic():
 
 
 def test_web_commands_use_python_runtime_and_preserve_graph():
+    from neuroliq.experiment import ExperimentDefinition
+
     graph, labels = build_m2_fixture()
     before = structure(graph)
-    with TestClient(create_app(graph, labels)) as client:
+    definition = ExperimentDefinition.model_validate(dict(
+        format_version=1, title="M2", concepts=[dict(id=c.id, label=labels[c.id]) for c in graph.concepts()],
+        connections=[dict(concept_a=c.concept_a, concept_b=c.concept_b, strength=c.strength) for c in graph.connections()],
+        run=dict(seeds={UUID(int=101): 1, UUID(int=102): 1}, decay=0.5, max_steps=3, max_active=2)))
+    with TestClient(create_app(definition)) as client:
         projection = client.get("/api/graph").json()
-        assert client.post("/api/activation/step").status_code == 422
-        request = dict(seeds={str(UUID(int=101)): 1, str(UUID(int=102)): 1},
-                       decay=0.5, max_steps=3, max_active=2)
-        assert client.post("/api/activation/start", json=request).json()["step"] == 0
+        assert client.post("/api/activation/start").json()["step"] == 0
         assert client.post("/api/activation/step").json()["trace"] == experiment()["traces"][1]
         assert client.post("/api/activation/run").json()["traces"] == experiment()["traces"]
         assert client.get("/api/activation").json()["step"] == 3
-        assert client.post("/api/activation/start", json={**request, "max_steps": -1}).status_code == 422
-        assert client.get("/api/activation").json()["step"] == 3
         assert client.post("/api/activation/reset").json()["activation"] == {}
         assert client.get("/api/graph").json() == projection
-        script = client.get("/static/app.js").text
-        assert 'request(button.id)' in script
-        assert 'state.activation[node.id()]' in script
-        assert 'contribution =' not in script
-        assert 'source_activation *' not in script
     assert structure(graph) == before
 
 

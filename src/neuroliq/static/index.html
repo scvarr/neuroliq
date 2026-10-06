@@ -1,46 +1,36 @@
 <!doctype html>
 <html lang="ru">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Neuroliq — наблюдатель активации</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <script defer src="/static/vendor/cytoscape.min.js"></script>
-  <script defer src="/static/app.js"></script>
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neuroliq Graph Lab</title><link rel="stylesheet" href="/static/style.css">
+<script defer src="/static/vendor/cytoscape.min.js"></script><script defer src="/static/app.js"></script></head>
 <body>
-  <header>
-    <div><h1>Neuroliq <span id="experiment-title">Активация</span></h1><p>Временная волна · постоянный граф только читается</p></div>
-    <div class="toolbar"><p id="counts" role="status">Загрузка графа…</p><button id="fit" disabled>Вписать граф</button></div>
-  </header>
-  <main>
-    <section class="viewport" aria-label="Граф концептов">
-      <div id="graph"></div>
-      <p class="hint">Колесо — масштаб · фон — перемещение · узел — перетаскивание</p>
-    </section>
-    <aside aria-label="Сведения о выбранном элементе">
-      <h2>Запуск</h2>
-      <div id="scenarios" class="commands" aria-label="Контролируемые сценарии"></div>
-      <p id="scenario-status" role="status"></p>
-      <p>Seeds: отметьте концепты и задайте activation. Изменение параметров начинает новую волну при следующей команде.</p>
-      <div id="seeds"></div>
-      <div class="parameters">
-        <label>decay <input id="decay" type="number" min="0" max="1" step="0.1" value="0.5"></label>
-        <label>max_active <input id="max-active" type="number" min="1" step="1" value="2"></label>
-        <label>max_steps <input id="max-steps" type="number" min="0" step="1" value="3"></label>
-      </div>
-      <div class="commands"><button id="reset">Сброс</button><button id="step">Шаг</button><button id="run">Выполнить</button></div>
-      <p id="activation-status" role="status"></p>
-      <label>Просмотр шага <select id="trace-step" aria-label="Просмотр шага" disabled></select></label>
-      <h2>Ранжирование кандидатов</h2>
-      <p>Одинаковая activation означает ничью; порядок UUID не определяет уникального лидера.</p>
-      <table><thead><tr><th>Концепт</th><th>activation</th><th>Состояние</th></tr></thead><tbody id="ranking"></tbody></table>
-      <h2>Вклады выбранного шага</h2>
-      <table><thead><tr><th>Переход</th><th>Множители</th><th>Вклад</th></tr></thead><tbody id="contributions"></tbody></table>
-      <h2>Выбранный элемент</h2>
-      <div id="details" aria-live="polite"><p>Выберите концепт или связь на графе.</p></div>
-      <h2>Trace выбранного шага</h2><pre id="trace">Нет временного состояния</pre><p class="note">Метки внешние. Связи неориентированные. Число strength показано без семантической интерпретации.</p>
-    </aside>
-  </main>
-</body>
-</html>
+<header><div><h1>Neuroliq Graph Lab</h1><p>Редактируемый эксперимент · вычисления в Python</p></div>
+<div class="toolbar"><span id="counts"></span><button id="fit">Вписать граф</button></div></header>
+<main><section class="viewport" aria-label="Граф концептов"><div id="graph"></div>
+<p class="hint">Колесо — масштаб · фон — перемещение · узел — перетаскивание</p></section>
+<aside>
+<p id="status" role="status"></p>
+<h2>Эксперимент</h2><label>Название <input id="title"></label>
+<div class="commands"><button id="new">Новый пустой</button><button id="export">Сохранить JSON</button></div>
+<label>Загрузить .neuroliq.json <input id="import" type="file" accept=".json,.neuroliq.json"></label>
+<details><summary>JSON эксперимента</summary><textarea id="json" rows="10" aria-label="JSON эксперимента"></textarea>
+<button id="import-json">Загрузить JSON из поля</button></details>
+<p>Изменения сохраняются после выхода из поля и очищают runtime. Удаление концепта удаляет его связи и seed.</p>
+<h2>Концепты и seeds</h2><div id="concepts"></div>
+<label>Метка нового концепта <input id="new-label" value="Концепт"></label><button id="add-concept">Добавить концепт</button>
+<h2>Связи</h2><div id="connections"></div>
+<div class="parameters"><label>Концепт A <select id="connection-a"></select></label>
+<label>Концепт B <select id="connection-b"></select></label><label>strength <input id="new-strength" type="number" step="any" value="1"></label></div>
+<button id="add-connection">Добавить связь</button>
+<h2>Запуск</h2><div class="parameters">
+<label>decay <input id="decay" type="number" min="0" max="1" step="any"></label>
+<label>max_active <input id="max-active" type="number" min="1" step="1"></label>
+<label>max_steps <input id="max-steps" type="number" min="0" step="1"></label></div>
+<div class="commands"><button id="start">Начать (шаг 0)</button><button id="step">Шаг</button><button id="run">Выполнить</button><button id="reset">Сброс</button></div>
+<p id="activation-status"></p><label>Просмотр шага <select id="trace-step"></select></label>
+<h2>Ранжирование кандидатов</h2><p>Одинаковая activation означает ничью; порядок UUID не определяет уникального лидера.</p>
+<table><thead><tr><th>Концепт</th><th>activation</th><th>Состояние</th></tr></thead><tbody id="ranking"></tbody></table>
+<h2>Вклады выбранного шага</h2><table><thead><tr><th>Переход</th><th>Множители</th><th>Вклад</th></tr></thead><tbody id="contributions"></tbody></table>
+<h2>Выбранный элемент</h2><pre id="details">Выберите концепт или связь</pre>
+<h2>Полный trace выбранного шага</h2><pre id="trace"></pre>
+</aside></main></body></html>

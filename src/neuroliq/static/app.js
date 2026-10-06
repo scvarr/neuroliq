@@ -1,240 +1,136 @@
 "use strict";
-
-const details = document.getElementById("details");
-const counts = document.getElementById("counts");
-const fit = document.getElementById("fit");
-
-function textElement(tag, text) {
-  const element = document.createElement(tag);
-  element.textContent = text;
-  return element;
+const $ = id => document.getElementById(id);
+let definition, state, cy, queue = Promise.resolve();
+const element = (tag, text) => { const item = document.createElement(tag); item.textContent = text; return item; };
+const labelFor = id => definition.concepts.find(c => c.id === id)?.label ?? id;
+async function api(path, method = "GET", body) {
+  const response = await fetch(`/api/${path}`, {method, headers: {"Content-Type": "application/json"}, body});
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(typeof error.detail === "string" ? error.detail : JSON.stringify(error.detail));
+  }
+  return response.json();
 }
-
-function field(list, name, value) {
-  list.append(textElement("dt", name), textElement("dd", value));
+// Очередь исключает пересечение сохранения формы и команды запуска.
+function task(action) {
+  queue = queue.then(async () => {
+    try { await action(); $("status").textContent = "Готово"; }
+    catch (error) { $("status").textContent = `Ошибка: ${error.message}`; }
+  });
+  return queue;
 }
-
-async function loadGraph() {
-  try {
-    const response = await fetch("/api/graph", { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const graph = await response.json();
-    const configResponse = await fetch("/api/experiment", { cache: "no-store" });
-    if (!configResponse.ok) throw new Error(`HTTP ${configResponse.status}`);
-    const config = await configResponse.json();
-    document.getElementById("experiment-title").textContent = config.title;
-    document.title = `Neuroliq — ${config.title}`;
-    function setParameters(parameters) {
-      document.getElementById("decay").value = parameters.decay;
-      document.getElementById("max-active").value = parameters.max_active;
-      document.getElementById("max-steps").value = parameters.max_steps;
-    }
-    setParameters(config.parameters);
-    let started = false;
-    let state;
-    const seedControls = document.getElementById("seeds");
-    for (const [index, concept] of graph.concepts.entries()) {
-      const row = document.createElement("label");
-      const enabled = document.createElement("input");
-      enabled.type = "checkbox";
-      enabled.checked = index < 2;
-      enabled.dataset.id = concept.id;
-      enabled.setAttribute("aria-label", `Seed ${concept.label}`);
-      const value = document.createElement("input");
-      value.type = "number";
-      value.min = "0";
-      value.step = "0.1";
-      value.value = "1";
-      value.setAttribute("aria-label", `Activation ${concept.label}`);
-      row.append(enabled, textElement("span", concept.label), value);
-      seedControls.append(row);
-    }
-    const concepts = new Map(graph.concepts.map(concept => [concept.id, concept]));
-    const cy = cytoscape({
-      container: document.getElementById("graph"),
-      elements: [
-        ...graph.concepts.map(concept => ({ data: concept })),
-        ...graph.connections.map(connection => ({ data: {
-          ...connection,
-          id: `${connection.concept_a}:${connection.concept_b}`,
-          source: connection.concept_a,
-          target: connection.concept_b
-        } }))
-      ],
-      layout: { name: "circle", padding: 70, avoidOverlap: true },
-      selectionType: "single",
-      style: [
-        { selector: "node", style: {
-          "label": "data(label)", "background-color": "#3975a9",
-          "width": 42, "height": 42, "color": "#243547",
-          "text-valign": "bottom", "text-margin-y": 10, "font-size": 16
-        } },
-        { selector: "node[activation > 0]", style: { "background-color": "#df8a22", "label": "data(displayLabel)" } },
-        { selector: "edge", style: {
-          "width": 2, "line-color": "#8a9eb2", "curve-style": "bezier"
-        } },
-        { selector: "node:selected", style: {
-          "border-width": 4, "border-color": "#df8a22"
-        } },
-        { selector: "edge:selected", style: { "line-color": "#df8a22" } }
-      ]
-    });
-    counts.textContent = `Концептов: ${graph.concepts.length} · Связей: ${graph.connections.length}`;
-    fit.disabled = false;
-    fit.addEventListener("click", () => cy.fit(undefined, 70));
-
-    function showDetails(element) {
-      const data = element.data();
-      details.replaceChildren(textElement("h3", element.isNode() ? "Концепт" : "Связь"));
-      const list = document.createElement("dl");
-      details.append(list);
-      if (element.isNode()) {
-        field(list, "ID", data.id);
-        field(list, "Метка", data.label);
-        field(list, "Текущая activation", String(data.activation || 0));
-        details.append(textElement("h3", `Соседи (${data.neighbors.length})`));
-        if (!data.neighbors.length) details.append(textElement("p", "Нет соседей — изолированный концепт."));
-        const neighbors = document.createElement("ul");
-        for (const id of data.neighbors) {
-          const item = textElement("li", concepts.get(id).label);
-          item.append(textElement("small", id));
-          neighbors.append(item);
-        }
-        details.append(neighbors);
-      } else {
-        for (const [name, id] of [["Конец A", data.concept_a], ["Конец B", data.concept_b]]) {
-          field(list, name, `${concepts.get(id).label} · ${id}`);
-        }
-        field(list, "strength", String(data.strength));
-      }
-    }
-    cy.on("select", "node, edge", event => showDetails(event.target));
-
-    async function request(command, body) {
-      const response = await fetch(`/api/activation/${command}`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: body ? JSON.stringify(body) : undefined
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(JSON.stringify(result.detail));
-      return result;
-    }
-    const traceStep = document.getElementById("trace-step");
-    traceStep.addEventListener("change", () => displayTrace(state.traces[Number(traceStep.value)]));
-    function displayTrace(trace) {
-      document.getElementById("trace").textContent = trace
-        ? JSON.stringify(trace, null, 2) : "Нет временного состояния";
-      const ranking = document.getElementById("ranking");
-      ranking.replaceChildren();
-      for (const candidate of trace?.candidates || []) {
-        const row = document.createElement("tr");
-        row.append(textElement("td", concepts.get(candidate.id).label),
-          textElement("td", String(candidate.activation)),
-          textElement("td", candidate.kept ? "Сохранён" : "Отсечён"));
-        ranking.append(row);
-      }
-      const contributions = document.getElementById("contributions");
-      contributions.replaceChildren();
-      for (const transition of trace?.transitions || []) {
-        const row = document.createElement("tr");
-        row.append(textElement("td", `${concepts.get(transition.source).label} → ${concepts.get(transition.target).label}`),
-          textElement("td", `${transition.source_activation} × ${transition.strength} × ${transition.decay}`),
-          textElement("td", String(transition.contribution)));
-        contributions.append(row);
-      }
-    }
-    function display(result) {
-      state = result;
-      cy.nodes().forEach(node => {
-        const activation = state.activation[node.id()] || 0;
-        node.data({ activation, displayLabel: `${node.data("label")} · ${activation}` });
-      });
-      document.getElementById("activation-status").textContent = state.step < 0
-        ? "Временное состояние сброшено"
-        : `Шаг ${state.step} / ${state.parameters.max_steps}`;
-      traceStep.replaceChildren();
-      for (const trace of state.traces) {
-        const option = textElement("option", `Шаг ${trace.step}`);
-        option.value = trace.step;
-        traceStep.append(option);
-      }
-      traceStep.disabled = !state.traces.length;
-      traceStep.value = state.step;
-      displayTrace(state.trace);
-      const selected = cy.$(":selected");
-      if (selected.length) showDetails(selected[0]);
-    }
-    document.querySelectorAll("#seeds input, .parameters input").forEach(input => {
-      input.addEventListener("input", () => {
-        started = false;
-        document.getElementById("scenario-status").textContent = "Ручные параметры";
-        document.getElementById("activation-status").textContent = "Параметры изменены — следующая команда начнёт новый запуск";
-      });
-    });
-    const buttons = ["reset", "step", "run"].map(id => document.getElementById(id));
-    const scenarioButtons = config.scenarios.map(scenario => {
-      const button = textElement("button", scenario.name);
-      button.addEventListener("click", () => {
-        for (const row of seedControls.children) {
-          const id = row.children[0].dataset.id;
-          row.children[0].checked = Object.hasOwn(scenario.seeds, id);
-          row.children[2].value = scenario.seeds[id] ?? 1;
-        }
-        setParameters(config.parameters);
-        started = false;
-        document.getElementById("scenario-status").textContent = `Сценарий: ${scenario.name}`;
-        document.getElementById("run").click();
-      });
-      document.getElementById("scenarios").append(button);
-      return button;
-    });
-    for (const button of buttons) {
-      button.addEventListener("click", async () => {
-        [...buttons, ...scenarioButtons].forEach(item => { item.disabled = true; });
-        document.querySelectorAll("aside input").forEach(input => { input.disabled = true; });
-        try {
-          if (button.id === "reset") {
-            display(await request("reset"));
-            started = false;
-          } else {
-            if (!started) {
-              const seeds = {};
-              for (const row of seedControls.children) {
-                if (row.children[0].checked) seeds[row.children[0].dataset.id] = Number(row.children[2].value);
-              }
-              display(await request("start", {
-                seeds, decay: Number(document.getElementById("decay").value),
-                max_active: Number(document.getElementById("max-active").value),
-                max_steps: Number(document.getElementById("max-steps").value)
-              }));
-              started = true;
-            }
-            display(await request(button.id));
-          }
-        } catch (error) {
-          document.getElementById("activation-status").textContent = `Ошибка: ${error.message}`;
-        } finally {
-          [...buttons, ...scenarioButtons].forEach(item => { item.disabled = false; });
-          document.querySelectorAll("aside input").forEach(input => { input.disabled = false; });
-        }
-      });
-    }
-    const initial = await fetch("/api/activation");
-    if (!initial.ok) throw new Error(`HTTP ${initial.status}`);
-    const initialState = await initial.json();
-    display(initialState);
-    if (initialState.parameters) {
-      document.getElementById("activation-status").textContent += " · следующий запуск использует параметры формы";
-    }
-    cy.resize();
-    cy.fit(undefined, 70);
-    cy.on("tap", event => {
-      if (event.target === cy) details.replaceChildren(textElement("p", "Выберите концепт или связь на графе."));
-    });
-  } catch (error) {
-    counts.textContent = "Граф не загружен";
-    details.replaceChildren(textElement("p", `Не удалось открыть граф: ${error.message}. Проверьте сервер и обновите страницу.`));
+async function replace(next) {
+  definition = await api("experiment", "PUT", JSON.stringify(next));
+  state = await api("activation");
+  render();
+}
+function edit(change) {
+  task(async () => { const next = structuredClone(definition); change(next); await replace(next); });
+}
+function input(type, value, name, changed) {
+  const field = document.createElement("input"); field.type = type; field.value = value;
+  field.setAttribute("aria-label", name);
+  if (type === "number") field.step = "any";
+  field.addEventListener("change", () => changed(type === "number" ? field.valueAsNumber : field.value));
+  return field;
+}
+function render() {
+  $("title").value = definition.title;
+  $("json").value = JSON.stringify(definition, null, 2);
+  $("concepts").replaceChildren(); $("connections").replaceChildren();
+  $("counts").textContent = `Концептов: ${definition.concepts.length} · Связей: ${definition.connections.length}`;
+  for (const c of definition.concepts) {
+    const row = element("div", ""); row.className = "editor-row";
+    row.append(input("text", c.label, `Метка ${c.label}`, value => edit(d => { d.concepts.find(x => x.id === c.id).label = value; })));
+    row.append(element("small", c.id));
+    const seed = input("checkbox", "", `Seed ${c.label}`, () => edit(d => {
+      if (seed.checked) d.run.seeds[c.id] = 1; else delete d.run.seeds[c.id];
+    }));
+    seed.checked = Object.hasOwn(definition.run.seeds, c.id);
+    const seedLabel = element("label", "Seed "); seedLabel.append(seed); row.append(seedLabel);
+    row.append(input("number", definition.run.seeds[c.id] ?? 1, `activation ${c.label}`, value => edit(d => { d.run.seeds[c.id] = value; })));
+    const remove = element("button", "Удалить концепт"); remove.addEventListener("click", () => edit(d => {
+      d.concepts = d.concepts.filter(x => x.id !== c.id);
+      d.connections = d.connections.filter(x => x.concept_a !== c.id && x.concept_b !== c.id);
+      delete d.run.seeds[c.id];
+    })); row.append(remove); $("concepts").append(row);
+  }
+  definition.connections.forEach((c, index) => {
+    const row = element("div", `${labelFor(c.concept_a)} ↔ ${labelFor(c.concept_b)} `); row.className = "editor-row";
+    row.append(input("number", c.strength, `strength ${labelFor(c.concept_a)} ${labelFor(c.concept_b)}`, value => edit(d => { d.connections[index].strength = value; })));
+    const remove = element("button", "Удалить связь"); remove.addEventListener("click", () => edit(d => { d.connections.splice(index, 1); })); row.append(remove);
+    $("connections").append(row);
+  });
+  for (const id of ["connection-a", "connection-b"]) {
+    $(id).replaceChildren(...definition.concepts.map(c => { const option = element("option", c.label); option.value = c.id; return option; }));
+  }
+  if (definition.concepts.length > 1) $("connection-b").selectedIndex = 1;
+  for (const [id, key] of [["decay", "decay"], ["max-active", "max_active"], ["max-steps", "max_steps"]]) $(id).value = definition.run[key];
+  cy.elements().remove();
+  cy.add([
+    ...definition.concepts.map(c => ({data: {id: c.id, label: c.label, displayLabel: c.label}})),
+    ...definition.connections.map((c, i) => ({data: {id: `edge-${i}`, source: c.concept_a, target: c.concept_b, strength: c.strength}}))
+  ]);
+  cy.layout({name: "circle"}).run();
+  $("details").textContent = "Выберите концепт или связь";
+  display();
+}
+function displayTrace(trace) {
+  $("trace").textContent = trace ? JSON.stringify(trace, null, 2) : "Нет временного состояния";
+  $("ranking").replaceChildren(); $("contributions").replaceChildren();
+  for (const c of trace?.candidates ?? []) {
+    const row = element("tr", "");
+    for (const value of [labelFor(c.id), c.activation, c.kept ? "Сохранён" : "Отсечён"]) row.append(element("td", value));
+    $("ranking").append(row);
+  }
+  for (const t of trace?.transitions ?? []) {
+    const row = element("tr", "");
+    for (const value of [`${labelFor(t.source)} → ${labelFor(t.target)}`, `${t.source_activation} × ${t.strength} × ${t.decay}`, t.contribution]) row.append(element("td", value));
+    $("contributions").append(row);
   }
 }
-
-loadGraph();
+function showDetails(item) {
+  $("details").textContent = JSON.stringify(item.isNode()
+    ? {id: item.id(), label: item.data("label"), activation: state.activation[item.id()] ?? 0}
+    : {concept_a: item.data("source"), concept_b: item.data("target"), strength: item.data("strength")}, null, 2);
+}
+function display() {
+  cy.nodes().forEach(node => {
+    const value = state.activation[node.id()] ?? 0;
+    node.data({displayLabel: `${node.data("label")} · ${value}`, active: Object.hasOwn(state.activation, node.id()) ? "yes" : "no"});
+  });
+  $("activation-status").textContent = state.step < 0 ? "Runtime сброшен" : `Шаг ${state.step} / ${state.parameters.max_steps}`;
+  $("trace-step").replaceChildren(...state.traces.map(t => { const option = element("option", `Шаг ${t.step}`); option.value = t.step; return option; }));
+  $("trace-step").value = state.step; $("trace-step").disabled = !state.traces.length;
+  displayTrace(state.trace);
+  const selected = cy.$(":selected"); if (selected.length) showDetails(selected[0]);
+}
+$("title").addEventListener("change", event => { const value = event.target.value; edit(d => { d.title = value; }); });
+for (const [id, key] of [["decay", "decay"], ["max-active", "max_active"], ["max-steps", "max_steps"]]) $(id).addEventListener("change", event => {
+  const value = event.target.valueAsNumber; edit(d => { d.run[key] = value; });
+});
+$("add-concept").onclick = () => { const label = $("new-label").value; edit(d => { d.concepts.push({id: crypto.randomUUID(), label}); }); };
+$("add-connection").onclick = () => {
+  const connection = {concept_a: $("connection-a").value, concept_b: $("connection-b").value, strength: $("new-strength").valueAsNumber};
+  edit(d => { d.connections.push(connection); });
+};
+$("new").onclick = () => task(() => replace({format_version: 1, title: "Новый эксперимент", concepts: [], connections: [], run: {seeds: {}, decay: 0.5, max_active: 10, max_steps: 2}}));
+$("import").onchange = event => { const file = event.target.files[0]; if (file) task(async () => { definition = await api("experiment", "PUT", await file.text()); state = await api("activation"); render(); $("import").value = ""; }); };
+$("import-json").onclick = () => { const source = $("json").value; task(async () => { definition = await api("experiment", "PUT", source); state = await api("activation"); render(); }); };
+$("export").onclick = () => task(async () => {
+  const link = document.createElement("a"); link.href = "/api/experiment/export";
+  link.download = "experiment.neuroliq.json"; document.body.append(link); link.click(); link.remove();
+});
+for (const command of ["start", "step", "run", "reset"]) $(command).onclick = () => task(async () => { state = await api(`activation/${command}`, "POST"); display(); });
+$("trace-step").onchange = () => displayTrace(state.traces.find(t => t.step === Number($("trace-step").value)));
+$("fit").onclick = () => cy.fit(undefined, 40);
+task(async () => {
+  cy = cytoscape({container: $("graph"), style: [
+    {selector: "node", style: {label: "data(displayLabel)", "background-color": "#617487", color: "#243547", "text-valign": "bottom", "text-margin-y": 8}},
+    {selector: 'node[active="yes"]', style: {"background-color": "#e89730"}},
+    {selector: "edge", style: {width: 2, "line-color": "#9aabbc"}},
+    {selector: ":selected", style: {"border-width": 3, "border-color": "#245e95", "line-color": "#245e95"}}
+  ]});
+  cy.on("tap", "node, edge", event => showDetails(event.target));
+  definition = await api("experiment"); state = await api("activation"); render();
+});
