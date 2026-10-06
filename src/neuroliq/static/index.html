@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neuroliq — наблюдатель графа M1</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/vendor/cytoscape.min.js"></script>
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <header>
+    <div><h1>Neuroliq <span>Граф M1</span></h1><p>Наблюдатель структуры · только чтение</p></div>
+    <div class="toolbar"><p id="counts" role="status">Загрузка графа…</p><button id="fit" disabled>Вписать граф</button></div>
+  </header>
+  <main>
+    <section class="viewport" aria-label="Граф концептов">
+      <div id="graph"></div>
+      <p class="hint">Колесо — масштаб · фон — перемещение · узел — перетаскивание</p>
+    </section>
+    <aside aria-label="Сведения о выбранном элементе">
+      <h2>Выбранный элемент</h2>
+      <div id="details" aria-live="polite"><p>Выберите концепт или связь на графе.</p></div>
+      <p class="note">Метки внешние. Связи неориентированные. Число strength показано без семантической интерпретации.</p>
+    </aside>
+  </main>
+</body>
+</html>
