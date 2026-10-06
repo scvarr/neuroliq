@@ -1,6 +1,6 @@
 # Текущее состояние
 
-Этап: M3 — проверено минимальное структурное пересечение через существующую наблюдаемую активацию M2 поверх ядра M1.
+Этап: M4 — проверено двухшаговое структурное пересечение на контролируемом fixture через неизменную активацию M2 поверх ядра M1.
 
 Состояние:
 - `Graph`, `Concept`, `ConceptId` и `Connection` хранят постоянную структуру в памяти; core-модель M1 не изменена;
@@ -18,16 +18,28 @@
 - локальный FastAPI web-наблюдатель показывает M2 fixture, принимает seeds и параметры, команды «Сброс», «Шаг», «Выполнить»; выбранный концепт показывает текущую activation, выбранная связь — persistent strength;
 - браузер отображает полученные activation и trace; всю вычислительную динамику выполняет Python;
 - targeted tests проверяют неизменность графа, формулу, aggregation, pruning, multi-seed, детерминизм, reset, параметры и web-команды;
-- отдельный механизм извлечения ответа, маршрутизация, retention/context memory, обучение, языковой слой, persistence, MCP и LLM отсутствуют; M3 подтверждает только структурное пересечение и контекстно-зависимое ранжирование на контролируемом fixture.
+- отдельный deterministic M4 fixture: A—C—X—D—B, C—E, D—F; семь концептов и шесть нетипизированных связей strength=1.0;
+- при decay=0.5, max_active=7, max_steps=2 одиночные A/B оставляют X в ничьей 0.25, совместные дают X=0.5 против остальных 0.25 через два вклада C→X и D→X; обратная волна C→A/D→B сохранена, pruning отсутствует;
+- M4 web-наблюдатель воспроизводит три сценария; общий экран позволяет просмотреть ranking, contributions и JSON trace каждого шага, вычисления остаются только в Python;
+- отдельный механизм извлечения ответа, маршрутизация, retention/context memory, обучение, языковой слой, persistence, MCP и LLM отсутствуют; M3/M4 подтверждают только структурное пересечение и зависимость ранжирования от seeds на контролируемых fixtures.
 
 Воспроизведение после `python -m pip install -e ".[test,web]"`:
 
 ```text
-python -m pytest tests/test_m3.py tests/test_activation.py tests/test_graph.py tests/test_package.py tests/test_web.py -q
+python -m pytest tests/test_m4.py tests/test_m3.py tests/test_activation.py tests/test_graph.py tests/test_package.py tests/test_web.py -q
+python -X utf8 -m neuroliq.m4_fixture
 python -X utf8 -m neuroliq.m3_fixture
 python -X utf8 -m neuroliq.m2_fixture
 python -X utf8 -m neuroliq.fixture
 ```
+
+Запуск M4-наблюдателя:
+
+```text
+python -m uvicorn neuroliq.web:m4_app --host 127.0.0.1 --port 8004
+```
+
+Открыть [http://127.0.0.1:8004](http://127.0.0.1:8004). Нажать A, B, A + B; счётчики 7/6. «Просмотр шага» показывает таблицы и исходный trace step 0, 1, 2. Итоговые значения X: 0.25 в обоих одиночных запусках (ничья), 0.5 в совместном (уникальный лидер). 48 targeted tests прошли; три сценария и история шагов вручную проверены в браузере. Полные traces и ограничения: [эксперимент M4](m4-experiment.md). Подтверждено только двухшаговое структурное пересечение на этом графе; рассуждение, универсальная маршрутизация и критерий всего первого цикла не подтверждены.
 
 Запуск M3-наблюдателя:
 

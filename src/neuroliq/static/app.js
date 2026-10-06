@@ -119,6 +119,30 @@ async function loadGraph() {
       if (!response.ok) throw new Error(JSON.stringify(result.detail));
       return result;
     }
+    const traceStep = document.getElementById("trace-step");
+    traceStep.addEventListener("change", () => displayTrace(state.traces[Number(traceStep.value)]));
+    function displayTrace(trace) {
+      document.getElementById("trace").textContent = trace
+        ? JSON.stringify(trace, null, 2) : "Нет временного состояния";
+      const ranking = document.getElementById("ranking");
+      ranking.replaceChildren();
+      for (const candidate of trace?.candidates || []) {
+        const row = document.createElement("tr");
+        row.append(textElement("td", concepts.get(candidate.id).label),
+          textElement("td", String(candidate.activation)),
+          textElement("td", candidate.kept ? "Сохранён" : "Отсечён"));
+        ranking.append(row);
+      }
+      const contributions = document.getElementById("contributions");
+      contributions.replaceChildren();
+      for (const transition of trace?.transitions || []) {
+        const row = document.createElement("tr");
+        row.append(textElement("td", `${concepts.get(transition.source).label} → ${concepts.get(transition.target).label}`),
+          textElement("td", `${transition.source_activation} × ${transition.strength} × ${transition.decay}`),
+          textElement("td", String(transition.contribution)));
+        contributions.append(row);
+      }
+    }
     function display(result) {
       state = result;
       cy.nodes().forEach(node => {
@@ -128,26 +152,15 @@ async function loadGraph() {
       document.getElementById("activation-status").textContent = state.step < 0
         ? "Временное состояние сброшено"
         : `Шаг ${state.step} / ${state.parameters.max_steps}`;
-      document.getElementById("trace").textContent = state.trace
-        ? JSON.stringify(state.trace, null, 2) : "Нет временного состояния";
-      const ranking = document.getElementById("ranking");
-      ranking.replaceChildren();
-      for (const candidate of state.trace?.candidates || []) {
-        const row = document.createElement("tr");
-        row.append(textElement("td", concepts.get(candidate.id).label),
-          textElement("td", String(candidate.activation)),
-          textElement("td", candidate.kept ? "Сохранён" : "Отсечён"));
-        ranking.append(row);
+      traceStep.replaceChildren();
+      for (const trace of state.traces) {
+        const option = textElement("option", `Шаг ${trace.step}`);
+        option.value = trace.step;
+        traceStep.append(option);
       }
-      const contributions = document.getElementById("contributions");
-      contributions.replaceChildren();
-      for (const transition of state.trace?.transitions || []) {
-        const row = document.createElement("tr");
-        row.append(textElement("td", `${concepts.get(transition.source).label} → ${concepts.get(transition.target).label}`),
-          textElement("td", `${transition.source_activation} × ${transition.strength} × ${transition.decay}`),
-          textElement("td", String(transition.contribution)));
-        contributions.append(row);
-      }
+      traceStep.disabled = !state.traces.length;
+      traceStep.value = state.step;
+      displayTrace(state.trace);
       const selected = cy.$(":selected");
       if (selected.length) showDetails(selected[0]);
     }

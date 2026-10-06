@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from .activation import Activation
 from .m2_fixture import build_m2_fixture
 from .m3_fixture import build_m3_fixture, observer_config
+from .m4_fixture import build_m4_fixture, observer_config as m4_observer_config
 from .graph import ConceptId, Graph
 
 
@@ -103,3 +104,5 @@ def create_app(graph: Graph, labels: Mapping[ConceptId, str], *,
 
 app = create_app(*build_m2_fixture())
 m3_app = create_app(*build_m3_fixture(), experiment_config=observer_config())
+
+m4_app = create_app(*build_m4_fixture(), experiment_config=m4_observer_config())
