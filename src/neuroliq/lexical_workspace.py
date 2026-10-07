@@ -12,6 +12,7 @@ import unicodedata
 from uuid import uuid4
 
 from .m6_2 import tokenize
+from . import persistent_l0
 
 GENERATOR = "ru-surface-prefix-v1"
 RULE = ("Только русские формы длиной ≥4 с частотой ≥2. Общий префикс ≥4; "
@@ -24,12 +25,14 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
-def build_workspace(documents, limit=10_000, title="Русский батч"):
+def build_workspace(documents, limit=10_000, title="Русский батч", *, start_row=0, start_ordinal=0):
     """Точный bounded-батч; документы — пары (ссылка источника, текст)."""
     if type(limit) is not int or limit < 1:
         raise ValueError("Лимит должен быть положительным целым числом")
     sources, occurrences = [], []
-    for reference, original in documents:
+    for row, (reference, original) in enumerate(documents):
+        if row < start_row:
+            continue
         text = unicodedata.normalize("NFC", original)
         # Карта casefold сохраняет позиции даже при расширении Unicode символа.
         folded, positions = [], []
@@ -38,19 +41,25 @@ def build_workspace(documents, limit=10_000, title="Русский батч"):
             positions.extend([index] * len(char.casefold()))
         folded = "".join(folded)
         cursor = 0
+        keys = list(tokenize(text))
+        skip = start_ordinal if row == start_row else 0
+        if skip >= len(keys):
+            continue
         source_id = len(sources)
         sources.append({"id": source_id, "reference": reference, "text": text,
                         "original_text": original,
                         "sha256": hashlib.sha256(original.encode("utf-8")).hexdigest(),
-                        "normalization": "NFC", "processed_tokens": 0})
-        for ordinal, key in enumerate(tokenize(text)):
+                        "normalization": "NFC", "processed_tokens": 0, "row": row})
+        for ordinal, key in enumerate(keys):
             start = folded.index(key, cursor)
             end = start + len(key)
+            cursor = end
+            if ordinal < skip:
+                continue
             occurrences.append({"id": len(occurrences), "source_id": source_id,
                                 "ordinal": ordinal, "key": key,
                                 "start": positions[start], "end": positions[end - 1] + 1})
             sources[-1]["processed_tokens"] += 1
-            cursor = end
             if len(occurrences) == limit:
                 break
         if len(occurrences) == limit:
@@ -184,10 +193,12 @@ class WorkspaceStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, revision INTEGER, data TEXT)")
+            persistent_l0.initialize(db)
 
     @contextmanager
     def connect(self):
         db = sqlite3.connect(self.path, timeout=30)
+        db.execute("PRAGMA foreign_keys=ON")
         try:
             with db:
                 yield db
@@ -210,8 +221,53 @@ class WorkspaceStore:
 
     def create(self, workspace):
         with self.connect() as db:
-            db.execute("INSERT INTO workspaces VALUES (?, ?, ?)",
-                       (workspace["id"], workspace["revision"], json.dumps(workspace, ensure_ascii=False)))
+            db.execute("BEGIN IMMEDIATE")
+            self._insert(db, workspace)
+            persistent_l0.project(db, workspace)
+
+    def _insert(self, db, workspace):
+        db.execute("INSERT INTO workspaces VALUES (?, ?, ?)",
+                   (workspace["id"], workspace["revision"], json.dumps(workspace, ensure_ascii=False)))
+
+    def create_dataset(self, documents, corpus, limit, title):
+        with self.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            start = persistent_l0.cursor(db, corpus)
+            workspace = build_workspace(documents, limit, title, start_row=start["row"],
+                                        start_ordinal=start["ordinal"])
+            if not workspace["occurrences"]:
+                raise ValueError("Корпус исчерпан; новых вхождений нет")
+            first = workspace["occurrences"][0]
+            first_row = workspace["sources"][first["source_id"]]["row"]
+            previous = start["previous_concept"] if first_row == start["row"] else None
+            last_concept = persistent_l0.project(db, workspace, previous)
+            last = workspace["occurrences"][-1]
+            end = {"row": workspace["sources"][last["source_id"]]["row"],
+                   "ordinal": last["ordinal"] + 1, "previous_concept": last_concept}
+            workspace["corpus"] = {"identity": corpus, "start": start, "end": end}
+            self._insert(db, workspace)
+            db.execute("INSERT INTO corpus_cursors VALUES (?, ?) ON CONFLICT(corpus) DO UPDATE SET data=excluded.data",
+                       (corpus, json.dumps(end)))
+        return workspace
+
+    def l0_stats(self):
+        with self.connect() as db:
+            db.execute("BEGIN")
+            return persistent_l0.stats(db)
+
+    def dictionary(self, query="", limit=50):
+        with self.connect() as db:
+            return persistent_l0.dictionary(db, query, limit)
+
+    def l0_neighborhood(self, concept, limit=50):
+        with self.connect() as db:
+            db.execute("BEGIN")
+            return persistent_l0.neighborhood(db, concept, limit)
+
+    def form_concepts(self, forms):
+        with self.connect() as db:
+            return {form: row[0] for form in forms for row in
+                    db.execute("SELECT concept_id FROM lexical_dictionary WHERE surface=?", (form,))}
 
     def decide(self, workspace_id, revision, **kwargs):
         with self.connect() as db:

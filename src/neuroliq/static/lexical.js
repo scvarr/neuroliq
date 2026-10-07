@@ -79,7 +79,7 @@ async function openFamily(id, preserve = false) {
   $('familyStatus').textContent = statuses[family.status];
   $('lineage').textContent = family.parent ? 'Выделена из семьи ' + family.parent : '';
   if (!preserve) $('note').value = '';
-  $('forms').innerHTML = family.forms.map(k => `<label><input class="pick form-pick" type="checkbox" value="${escapeHtml(k)}">${escapeHtml(k)} <small>×${family.form_counts[k]}</small></label>`).join('');
+  $('forms').innerHTML = family.forms.map(k => `<div><label><input class="pick form-pick" type="checkbox" value="${escapeHtml(k)}">${escapeHtml(k)} <small>×${family.form_counts[k]}</small></label>${family.concept_ids[k] ? `<a href="/l0?concept=${encodeURIComponent(family.concept_ids[k])}">ConceptId / L0 ↗</a>` : ''}</div>`).join('');
   $('examples').replaceChildren();
   for (const o of family.examples) {
     const el = document.createElement('div'); el.className = 'example';

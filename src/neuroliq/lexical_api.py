@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -70,13 +70,17 @@ def install_lexical_api(app, path=None):
                      ((f"{DATASET}@{REVISION}/{SPLIT}/{SHARD}#row={i}", text)
                       for i, text in enumerate(validation_documents())))
         try:
-            workspace = build_workspace(documents, batch.limit, batch.title)
+            if batch.source == "dataset":
+                corpus = f"{DATASET}@{REVISION}/{SPLIT}/{SHARD}"
+                workspace = storage().create_dataset(documents, corpus, batch.limit, batch.title)
+            else:
+                workspace = build_workspace(documents, batch.limit, batch.title)
+                storage().create(workspace)
         except (OSError, ImportError, ValueError) as error:
             raise HTTPException(422, f"Не удалось обработать корпус: {error}") from error
         finally:
             if hasattr(documents, "close"):
                 documents.close()
-        storage().create(workspace)
         return {"id": workspace["id"]}
 
     @router.get("/{workspace_id}")
@@ -105,7 +109,7 @@ def install_lexical_api(app, path=None):
         f = next((f for f in w["families"] if f["id"] == family_id), None)
         if f is None:
             raise HTTPException(404, "Семья не найдена")
-        return family_view(w, f)
+        return family_view(w, f) | {"concept_ids": storage().form_concepts(f["forms"])}
 
     @router.post("/{workspace_id}/families/{family_id}")
     def decide(workspace_id: str, family_id: str, decision: Decision):
@@ -124,3 +128,22 @@ def install_lexical_api(app, path=None):
     @app.get("/lexical", include_in_schema=False)
     def page():
         return FileResponse(Path(__file__).with_name("static") / "lexical.html")
+
+    @app.get("/l0", include_in_schema=False)
+    def l0_page():
+        return FileResponse(Path(__file__).with_name("static") / "l0.html")
+
+    @app.get("/api/l0")
+    def l0_stats():
+        return storage().l0_stats()
+
+    @app.get("/api/l0/dictionary")
+    def dictionary(q: str = Query(default="", max_length=500), limit: int = Query(default=50, ge=1, le=200)):
+        return storage().dictionary(q, limit)
+
+    @app.get("/api/l0/concepts/{concept_id}")
+    def neighborhood(concept_id: str, limit: int = Query(default=50, ge=1, le=200)):
+        try:
+            return storage().l0_neighborhood(concept_id, limit)
+        except KeyError as error:
+            raise HTTPException(404, str(error)) from error

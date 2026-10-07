@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Neuroliq · Постоянный L0</title><link rel="stylesheet" href="/static/lexical.css"><link rel="stylesheet" href="/static/l0.css"></head>
+<body>
+<header><div><span class="eyebrow">NEUROLIQ / L0 BOOTSTRAP</span><h1>Постоянный L0</h1></div><a href="/lexical">Лексическое ревью ↗</a><a href="/">Graph Lab ↗</a></header>
+<div id="message" role="status" aria-live="polite"></div>
+<main><p id="stats"></p><details><summary>Продолжение фиксированного корпуса</summary><pre id="cursor"></pre></details>
+<div class="l0-layout"><aside><h2>Внешний словарь</h2><form id="searchForm"><label>Начало нормализованной формы<input id="query" type="search" maxlength="500"></label><button>Найти</button></form><p id="searchInfo"></p><div id="results"></div></aside>
+<section><form id="conceptForm"><label>Открыть ConceptId<input id="concept" required></label><label>Лимит соседей<input id="limit" type="number" value="50" min="1" max="200"></label><button>Исследовать</button></form><p id="selection"></p><p id="neighborhoodInfo"></p><div id="graph" aria-label="Локальный подграф L0"></div><h2>Концепты подграфа</h2><div id="neighbors"></div></section></div>
+<p>Подписи форм взяты из внешнего словаря. В L0 хранятся только непрозрачные ID и неориентированные структурные связи. Нажмите на узел, чтобы открыть его соседство.</p></main>
+<script src="/static/vendor/cytoscape.min.js"></script><script src="/static/l0.js"></script>
+</body></html>
