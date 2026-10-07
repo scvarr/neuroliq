@@ -1,25 +1,25 @@
 # Neuroliq Graph Lab
 
-M4.1 — инструментальная подготовка к M5. Это единый редактор и наблюдатель существующего Activation M2; нового исследовательского алгоритма нет.
+Graph Lab, введённый в M4.1, — единый редактор и наблюдатель Activation M2. Этот документ описывает запуск, формат файла и пользовательскую процедуру. API и lifecycle реализации — в [architecture.md](architecture.md); текущая фаза проекта — в [current-state.md](current-state.md).
 
 ## Запуск
 
 Из корня проекта с установленным Docker Desktop:
 
-```text
+```bat
 docker compose up --build
 ```
 
 Открыть [Graph Lab](http://127.0.0.1:17890). Остановить:
 
-```text
+```bat
 docker compose down
 ```
 
-Один контейнер FastAPI/uvicorn обслуживает Python API и статический frontend. Внутренний порт 8000; внешний задаёт `NEUROLIQ_PORT`, по умолчанию 17890. Binding только localhost. Например, в PowerShell:
+Один контейнер FastAPI/uvicorn обслуживает Python API и статический frontend. Внутренний порт 8000; внешний задаёт `NEUROLIQ_PORT`, по умолчанию 17890. Binding только localhost. Например, в Windows cmd.exe:
 
-```powershell
-$env:NEUROLIQ_PORT = "17891"
+```bat
+set "NEUROLIQ_PORT=17891"
 docker compose up --build
 ```
 
@@ -48,7 +48,7 @@ UTF-8 JSON, версия 1, строго следующие поля:
 
 Seeds ссылаются на существующие UUID; activation конечная и неотрицательная. Пустой набор допустим в описании, но Activation требует хотя бы один seed при запуске. decay — конечное число от 0 до 1, max_active — целое >=1, max_steps — целое >=0. Булевы значения, числовые строки, NaN/inf, неизвестные поля, версия и ссылки, повторные JSON-ключи отклоняются. Strength допускает отрицательные числа согласно Graph; существующий M2 отклоняет их при запуске.
 
-`ExperimentDefinition.load(path)`, `save(path)`, `from_json(text)`, `to_json()` обеспечивают эквивалентный save/load round-trip с сохранением UUID, labels, strength, seeds и параметров. Порядок массивов и ориентация концов в документе сохраняются, хотя Graph канонизирует пару. Форматирование JSON и исходное текстовое написание UUID/чисел не являются частью definition. Runtime, activation по шагам, trace и позиции узлов в файл не входят.
+Сохранение и загрузка обеспечивают эквивалентный round-trip с сохранением UUID, labels, strength, seeds и параметров. Порядок массивов и ориентация концов в документе сохраняются, хотя Graph канонизирует пару. Форматирование JSON и исходное текстовое написание UUID/чисел не являются частью definition. Runtime, activation по шагам, trace и позиции узлов в файл не входят.
 
 ## Работа в интерфейсе
 
@@ -64,13 +64,13 @@ Seeds ссылаются на существующие UUID; activation коне
 
 Загрузите `experiments/m3-simple-retrieval.neuroliq.json`: 5/4, совместные seeds уже заданы. «Выполнить» даёт ПАРИЖ=1.0, ЛОНДОН=ЛИОН=0.5. Отключите ФРАНЦИЯ и повторите: ПАРИЖ=ЛОНДОН=0.5; затем включите ФРАНЦИЯ, отключите СТОЛИЦА: ПАРИЖ=ЛИОН=0.5. Восстановление обоих seeds возвращает совместный результат.
 
-Загрузите `experiments/m4-two-step-bridge.neuroliq.json`: 7/6. Совместные A/B дают X=0.5 и A=B=E=F=0.25 на шаге 2. Только A даёт A=X=E=0.25, только B — B=X=F=0.25. Шаги 0, 1, 2 и обратные вклады доступны в trace. Исследовательские выводы и полные таблицы сохранены в документах M3/M4.
+Загрузите `experiments/m4-two-step-bridge.neuroliq.json`: 7/6. Совместные A/B дают X=0.5 и A=B=E=F=0.25 на шаге 2. Только A даёт A=X=E=0.25, только B — B=X=F=0.25. Шаги 0, 1, 2 и обратные вклады доступны в trace. Эти числа — контрольные ожидания для процедуры; исследовательские выводы и полные таблицы сохранены в [M3](m3-experiment.md) и [M4](m4-experiment.md).
 
 ## Проверка
 
 Для разработки: `python -m pip install -e ".[test,web]"`, затем:
 
-```text
+```bat
 python -m pytest tests/test_experiment.py tests/test_m3.py tests/test_m4.py tests/test_activation.py tests/test_graph.py tests/test_package.py tests/test_web.py -q
 git diff --check
 ```

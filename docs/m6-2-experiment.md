@@ -49,7 +49,7 @@ Checkpoints по умолчанию: 10_000, 100_000, 1_000_000, 10_000_000; п�
 
 После успешного окончания входа всегда выдаётся `final`, в том числе для пустого входа и при окончании точно на checkpoint (тогда дельты равны нулю). Final между checkpoints содержит дельты от последнего достигнутого checkpoint. Checkpoint содержит основные метрики, распределение и top-N; final дополнительно содержит все частоты токенов/пар и degree каждого узла. Snapshots — независимые копии; чтение final не меняет baseline.
 
-Из корня с установленными зависимостями, на Windows с `$env:PYTHONUTF8='1'`:
+Из корня с установленными зависимостями; на Windows предварительно в cmd.exe: `set PYTHONUTF8=1`, либо в PowerShell: `$env:PYTHONUTF8='1'`:
 
 ```text
 python -m neuroliq.m6_2 experiments/m6-2-raw-text.txt --checkpoints 10 20 30 --top-n 3

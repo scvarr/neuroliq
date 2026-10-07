@@ -81,7 +81,7 @@ python -m pytest tests/test_m6_1.py tests/test_m6_0.py -q
 git diff --check
 ```
 
-На Windows перед этими командами: `$env:PYTHONUTF8='1'`. Системный CP1251 у subprocess CLI M6.0 иначе несовместим с чтением JSON bytes как UTF-8 в существующем тесте; M6.0 ради окружения не менялся.
+На Windows перед этими командами в cmd.exe: `set PYTHONUTF8=1`; эквивалент в PowerShell: `$env:PYTHONUTF8='1'`. Системный CP1251 у subprocess CLI M6.0 иначе несовместим с чтением JSON bytes как UTF-8 в существующем тесте; M6.0 ради окружения не менялся.
 
 19 targeted tests прошли: 7 M6.1 и 12 M6.0. Новые проверки непосредственно подтверждают два пути, исключение HUMAN общим правилом, отсутствие циклов, границы длины/раскрытий, точные seeds, активации, support и лидеров, полный набор contributions и восстановление всей activation из них, отсутствие pruning, отдельность candidate concepts от OccurrenceId, неизменность bytes/структуры bundle, Graph и объектов Concept/Connection. Пересборка с произвольными UUID, обратным порядком создания и переименованными OccurrenceId без передачи labels сохраняет результаты с точностью до отображения UUID. CLI соответствует вычисленной диагностике. `git diff --check` прошёл. Полный suite не запускался: core и M6.0 не менялись, широкий regression cone отсутствует.
 

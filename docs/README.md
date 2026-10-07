@@ -8,30 +8,30 @@
 
 ### Текущее состояние (current state)
 
-- [current-state.md](current-state.md) — актуальная точка проекта: выполненные этапы, границы реализации, текущий исследовательский фокус и ближайшие открытые вопросы.
+- [current-state.md](current-state.md) — краткая актуальная сводка: текущая позиция, границы реализации и исследовательский фокус; исторические подробности остаются в отчётах.
 - [README.md](README.md) — этот навигатор: карта дерева и выбор маршрута чтения.
 
 ### Реализованная архитектура (implemented architecture)
 
-- [architecture.md](architecture.md) — описание реально реализованного устройства: графовое ядро M1, временная активация M2, ExperimentDefinition и Graph Lab. Этот документ должен описывать реализацию; исследовательские предложения сами по себе не становятся её частью.
+- [architecture.md](architecture.md) — описание реально реализованного устройства: графовое ядро M1, временная активация M2, ExperimentDefinition и Graph Lab, с краткой картой изолированных bounded-модулей M5/M6. Этот документ должен описывать реализацию; исследовательские предложения сами по себе не становятся её частью.
 
 ### Исследовательская основа (foundation) и терминология
 
 - [foundation.md](foundation.md) — исходная исследовательская основа: назначение проекта, устойчивые принципы, вопросы исследования и последовательность M0–M8. Также содержит гипотетические направления; наличие идеи здесь не означает её реализацию или подтверждение.
 - [glossary.md](glossary.md) — справочник рабочих терминов. Определения могут уточняться; словарь сам по себе не подтверждает существование механизма в коде.
 
-### Рабочие исследовательские гипотезы (active research hypotheses)
+### Рабочие исследовательские гипотезы
 
-Эта группа содержит непроверенные модели и направления, а также обсуждение ограниченных проверок. Актуальность направления определяется с учётом `current-state.md`; статус и границы каждой гипотезы следует читать в самом документе.
+Эта группа содержит непроверенные модели и обсуждение ограниченных проверок. Текущий фокус — L0/bootstrap; полноценные маршруты и динамика временно отложены согласно [current-state.md](current-state.md). Это выбор исследовательского фокуса, не формальная иерархия истинности; статус и границы читаются в самих документах.
 
-- [l0-skeleton-construction-hypotheses.md](l0-skeleton-construction-hypotheses.md) — уточнённая исследовательская рамка скелетного L0 после M6.3: структурные механизмы, факторизация, lexical workspace и batch bootstrap.
-- [knowledge-ingestion-hypotheses.md](knowledge-ingestion-hypotheses.md) — гипотезы заполнения графа: языковой слой, сопоставление с L0, наблюдения, статистика и возможная роль LLM.
-- [knowledge-representation-hypotheses.md](knowledge-representation-hypotheses.md) — гипотезы многомерного представления знаний: ConceptId/OccurrenceId, Route/RouteBundle, координаты знания и отличие сохранённой структуры от вычислительного пути.
-- [session-state-hypotheses.md](session-state-hypotheses.md) — гипотезы длительного состояния сессии и краткоживущей направленной динамики после M5.2/M5.3.
+- [l0-skeleton-construction-hypotheses.md](l0-skeleton-construction-hypotheses.md) — каноническая подробная гипотеза текущего фокуса L0/bootstrap: структурные механизмы, факторизация, source observations/rebuild, lexical workspace и batch bootstrap после M6.3.
+- [knowledge-ingestion-hypotheses.md](knowledge-ingestion-hypotheses.md) — каноническая гипотеза преобразования и сопоставления источника, evidence и границы enrichment. Связана с текущим bootstrap; полный смысловой ingestion и роль LLM остаются будущим исследованием.
+- [knowledge-representation-hypotheses.md](knowledge-representation-hypotheses.md) — каноническая гипотеза временно отложенной линии представления знаний: ConceptId/OccurrenceId, Route/RouteBundle, координаты знания и отличие сохранённой структуры от вычислительного пути.
+- [session-state-hypotheses.md](session-state-hypotheses.md) — гипотеза временно отложенной линии состояния сессии и краткоживущей направленной динамики после M5.2/M5.3.
 
 ### Эксперименты и исторические результаты (experiment results)
 
-- [experiments.md](experiments.md) — исходный документ «Индекс экспериментов», задающий формат описания эксперимента. Для перехода к существующим отчётам используйте список ниже.
+- [experiments.md](experiments.md) — контракт оформления проверяемого эксперимента; единственный список исторических отчётов — ниже.
 
 Семейство `m*-experiment.md` фиксирует контракты, исходные условия, диагностику, результаты и границы выводов конкретных экспериментов:
 
@@ -56,7 +56,7 @@
 
 ### Исследовательские инструменты (tooling)
 
-- [graph-lab.md](graph-lab.md) — эксплуатационная документация Graph Lab: запуск и остановка, формат файла эксперимента, интерфейс, воспроизведение M3/M4 и проверки.
+- [graph-lab.md](graph-lab.md) — эксплуатационная документация Graph Lab: команды cmd.exe, формат файла, пользовательская процедура и контрольные ожидания M3/M4; API/lifecycle описывает architecture.md.
 
 ### Правила работы (workflow)
 
@@ -84,7 +84,8 @@
 | Новый ChatGPT-чат | [docs/chatgpt.md](chatgpt.md) → [docs/current-state.md](current-state.md) → [docs/README.md](README.md) → только релевантные документы. Проверка актуального репозитория выполняется по workflow-контракту ChatGPT. |
 | Codex implementation/research task | [AGENTS.md](../AGENTS.md) → [current-state.md](current-state.md) → [README.md](README.md) → документы ограниченной задачи: для реализации — архитектура и релевантный ADR; для исследования — основа, соответствующая гипотеза и связанные экспериментальные отчёты. `chatgpt.md` не входит в обычный обязательный маршрут Codex. |
 | Текущая реализованная архитектура | [current-state.md](current-state.md) → [README.md](README.md) → [architecture.md](architecture.md) → [ADR-001](decisions/ADR-001-untyped-weighted-edges.md), если задача касается рёбер; [graph-lab.md](graph-lab.md), если задача касается стенда. Отчёты экспериментов читать для механизмов и проверок соответствующего этапа. |
-| Исследование L0/bootstrap | [current-state.md](current-state.md) → [README.md](README.md) → [l0-skeleton-construction-hypotheses.md](l0-skeleton-construction-hypotheses.md) → [knowledge-ingestion-hypotheses.md](knowledge-ingestion-hypotheses.md) → [M6.2](m6-2-experiment.md) и [M6.3](m6-3-experiment.md). [foundation.md](foundation.md) и [ADR-001](decisions/ADR-001-untyped-weighted-edges.md) — для исследовательских принципов и ограничений; [architecture.md](architecture.md) — для границы существующей реализации. |
+| Исследование L0/bootstrap | [current-state.md](current-state.md) → [README.md](README.md) → [l0-skeleton-construction-hypotheses.md](l0-skeleton-construction-hypotheses.md) → [M6.2](m6-2-experiment.md) и [M6.3](m6-3-experiment.md). [knowledge-ingestion-hypotheses.md](knowledge-ingestion-hypotheses.md) — если задача касается преобразования/поддержки источника; [foundation.md](foundation.md) и [ADR-001](decisions/ADR-001-untyped-weighted-edges.md) — для исследовательских принципов и ограничений; [architecture.md](architecture.md) — для границы существующей реализации. |
+| Представление знаний и достраивание | [current-state.md](current-state.md) → [README.md](README.md) → [knowledge-representation-hypotheses.md](knowledge-representation-hypotheses.md) → [M6.0](m6-0-experiment.md) и [M6.1](m6-1-experiment.md). [L0-рамка](l0-skeleton-construction-hypotheses.md) — для границы будущей основы; [ingestion](knowledge-ingestion-hypotheses.md) — для поддержки источника; [session-state](session-state-hypotheses.md) — только для вопросов динамики. |
 | Проверка исторического эксперимента | [current-state.md](current-state.md) → [README.md](README.md) → конкретный `m*-experiment.md` из таблицы выше → указанные в отчёте исходные данные, параметры, команды и диагностические артефакты. [graph-lab.md](graph-lab.md) — если воспроизведение использует стенд; предшествующие отчёты — если на них опирается контроль. Результат оценивается в условиях своего эксперимента. |
 
 Для ChatGPT тематические маршруты продолжают обязательную последовательность `docs/chatgpt.md` → `docs/current-state.md` → `docs/README.md`, а не заменяют её. [glossary.md](glossary.md) используется по необходимости для уточнения рабочих терминов.
