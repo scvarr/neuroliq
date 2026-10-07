@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Neuroliq · Thought Workbench</title><link rel="stylesheet" href="/static/lexical.css"><link rel="stylesheet" href="/static/thought-workbench.css"></head>
+<body>
+<header><div><span class="eyebrow">NEUROLIQ / РУЧНЫЕ КОНСТРУКЦИИ</span><h1>Thought Workbench</h1></div><a href="/">Graph Lab ↗</a><a href="/l0">Постоянный L0 ↗</a><a href="/lexical">Лексическое ревью ↗</a></header>
+<div id="message" role="status" aria-live="polite"></div>
+<main>
+<p>Концепты и их подсказки создаёт исследователь. Стрелки задают только структуру конкретной мысли. Каждая успешная операция сразу сохраняется в SQLite.</p>
+<div class="exchange"><a href="/api/thought-workbench/export" download>Экспорт полного JSON</a><label>Импорт с заменой всего Workbench<input id="importFile" type="file" accept=".json,application/json"></label><button id="importButton">Импортировать snapshot</button></div>
+<p id="counts"></p>
+<div class="workbench-layout">
+<aside>
+<h2>Каталог концептов</h2>
+<label>Поиск по подсказке или ID<input id="conceptSearch" type="search"></label>
+<label>Reusable concept<select id="conceptList" size="7"></select></label>
+<form id="conceptForm"><label>Подсказка концепта<textarea id="conceptAnnotation" rows="2"></textarea></label><button>Сохранить концепт</button><button type="button" id="newConcept">Новый концепт</button><button type="button" id="deleteConcept">Удалить концепт</button></form>
+<small id="conceptId"></small>
+<h2>Исходные фрагменты</h2>
+<label>Фрагмент<select id="sourceList"></select></label>
+<form id="sourceForm"><label>Исходный текст<textarea id="sourceText" rows="4"></textarea></label><label>Контекст / заметки<textarea id="sourceContext" rows="3"></textarea></label><button>Сохранить фрагмент</button><button type="button" id="newSource">Новый фрагмент</button><button type="button" id="deleteSource">Удалить фрагмент</button></form>
+<small id="sourceId"></small>
+</aside>
+<section>
+<h2>Сохранённые мысли</h2>
+<label>Мысль<select id="thoughtList"></select></label>
+<form id="thoughtForm"><label>Подсказка мысли<input id="thoughtAnnotation"></label><label>Источник мысли<select id="thoughtSource"></select></label><button>Сохранить мысль</button><button type="button" id="newThought">Новая мысль</button><button type="button" id="deleteThought">Удалить мысль</button></form>
+<small id="thoughtId"></small><p id="thoughtEvidence"></p>
+<div id="graph" aria-label="Направленный граф мысли"></div><button id="fit">Вписать граф</button>
+<p>Выберите узел для редактирования. Для повторного участия концепта добавьте новый локальный элемент с тем же ConceptId.</p>
+<div class="construction">
+<form id="elementForm"><h3>Локальный элемент</h3><label>Элемент<select id="elementList"></select></label><label>Вид<select id="elementKind"><option value="concept">Reusable concept</option><option value="literal">Literal / текстовое значение</option></select></label><label id="conceptChoiceLabel">Концепт из каталога<select id="elementConcept"></select></label><label id="literalLabel" hidden>Значение (текст)<textarea id="elementValue" rows="2"></textarea></label><label>Локальная подсказка<textarea id="elementAnnotation" rows="2"></textarea></label><small id="elementId"></small><button>Сохранить элемент</button><button type="button" id="newElement">Новый элемент</button><button type="button" id="deleteElement">Удалить элемент и его связи</button></form>
+<form id="linkForm"><h3>Направленная связь</h3><label>Откуда<select id="linkSource"></select></label><label>Куда<select id="linkTarget"></select></label><button>Добавить стрелку</button><label>Сохранённая связь<select id="linkList" size="5"></select></label><button type="button" id="deleteLink">Удалить стрелку</button><p>Ветвление: добавьте несколько стрелок из одного элемента. Семантических типов связей нет.</p></form>
+</div>
+</section>
+</div></main>
+<script src="/static/vendor/cytoscape.min.js"></script><script src="/static/thought-workbench.js"></script>
+</body></html>

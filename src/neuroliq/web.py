@@ -100,6 +100,8 @@ def create_app(definition: ExperimentDefinition | None = None, *, workspace_path
     app.mount("/static", StaticFiles(directory=static), name="static")
     from .lexical_api import install_lexical_api
     install_lexical_api(app, workspace_path)
+    from .thought_api import install_thought_api
+    install_thought_api(app, workspace_path)
     return app
 
 

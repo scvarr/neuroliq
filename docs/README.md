@@ -61,6 +61,8 @@
 
 ### Исследовательские инструменты (tooling)
 
+- [thought-workbench.md](thought-workbench.md) — ручной постоянный каталог концептов и редактор конкретных мыслей, полный канонический JSON для внешнего review.
+
 - [graph-lab.md](graph-lab.md) — эксплуатационная документация Graph Lab: команды cmd.exe, формат файла, пользовательская процедура и контрольные ожидания M3/M4; API/lifecycle описывает architecture.md.
 - [lexical-workspace.md](lexical-workspace.md) — локальный русский bootstrap workspace: генерация семей, ревью, SQLite/provenance, API и границы реализации.
 
