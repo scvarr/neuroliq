@@ -124,7 +124,7 @@ def test_restart_persistence_more_and_stale_revision(tmp_path):
 
 
 @pytest.mark.parametrize('change', [
-    {'note':'   '}, {'reviewer':'   '}, {'forms':['чужая'], 'action':'split'},
+    {'reviewer':''}, {'reviewer':'   '}, {'forms':['чужая'], 'action':'split'},
 ])
 def test_rejected_decision_preserves_everything(tmp_path, change):
     store = WorkspaceStore(tmp_path / 'atomic.db')
@@ -134,6 +134,56 @@ def test_rejected_decision_preserves_everything(tmp_path, change):
     payload.update(change)
     with pytest.raises(ValueError):
         store.decide(w['id'], 0, **payload)
+    assert store.load(w['id']) == w
+
+
+@pytest.mark.parametrize('action', ['accept', 'reject', 'split'])
+@pytest.mark.parametrize('note', [None, '', '   ', 'Различия проверены в контексте'])
+def test_optional_note_and_automatic_provenance_survive_restart(tmp_path, action, note):
+    path = tmp_path / 'optional-note.db'
+    store = WorkspaceStore(path)
+    w = build_workspace(corpus())
+    store.create(w)
+    f = w['families'][0]
+    url = f"/api/lexical/{w['id']}/families/{f['id']}"
+    payload = {'revision':0, 'action':action, 'reviewer':'Автор'}
+    if note is not None:
+        payload['note'] = note
+    if action == 'split':
+        payload['selected'] = [f['members'][0]]
+    client = TestClient(create_app(workspace_path=path))
+    assert client.post(url, json=payload).status_code == 200
+    assert client.post(url, json=payload).status_code == 409
+    client = TestClient(create_app(workspace_path=path))
+    restored = client.get(f"/api/lexical/{w['id']}/export").json()['workspace']
+    event, = restored['events']
+    assert event['note'] == ('' if note is None else note)
+    assert event['reviewer'] == 'Автор' and event['action'] == action
+    assert event['at'] and event['revision'] == restored['revision'] == 1
+    assert event['family_id'] == f['id']
+    assert event['members_before'] == f['members']
+    assert event['inspected'] == evidence_order(w, f)[0][:f['shown']]
+    assert restored['sources'] == w['sources'] and restored['occurrences'] == w['occurrences']
+    if action == 'split':
+        parent, child = restored['families'][:2]
+        assert event['child_id'] == child['id'] and event['moved'] == child['members'] == payload['selected']
+        assert set(parent['members']) | set(child['members']) == set(f['members'])
+        assert not set(parent['members']) & set(child['members'])
+    else:
+        assert restored['families'][0]['status'] == ('accepted' if action == 'accept' else 'rejected')
+
+
+@pytest.mark.parametrize('action', ['accept', 'reject', 'split'])
+@pytest.mark.parametrize('reviewer', ['', '   '])
+def test_empty_reviewer_rejected_without_note_and_without_mutation(tmp_path, action, reviewer):
+    path = tmp_path / 'required-reviewer.db'
+    store = WorkspaceStore(path)
+    w = build_workspace(corpus())
+    store.create(w)
+    f = w['families'][0]
+    client = TestClient(create_app(workspace_path=path))
+    payload = {'revision':0, 'action':action, 'reviewer':reviewer, 'selected':[f['members'][0]]}
+    assert client.post(f"/api/lexical/{w['id']}/families/{f['id']}", json=payload).status_code == 422
     assert store.load(w['id']) == w
 
 

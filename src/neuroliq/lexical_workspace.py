@@ -131,14 +131,14 @@ def family_view(workspace, family):
                                                if e["family_id"] == family["id"] or e.get("child_id") == family["id"]]}
 
 
-def review(workspace, family_id, action, reviewer, note, selected=(), forms=()):
+def review(workspace, family_id, action, reviewer, note="", selected=(), forms=()):
     family = next((f for f in workspace["families"] if f["id"] == family_id), None)
     if family is None:
         raise KeyError("Семья не найдена")
     if action not in ("accept", "reject", "split", "more"):
         raise ValueError("Неизвестное действие")
-    if not reviewer.strip() or (action != "more" and not note.strip()):
-        raise ValueError("Укажите проверяющего и основание решения")
+    if not reviewer.strip():
+        raise ValueError("Укажите проверяющего")
     if action != "more" and family["status"] != "pending":
         raise ValueError("Решение уже принято; разделять можно только ожидающую семью")
     event = {"at": now(), "family_id": family_id, "action": action, "reviewer": reviewer,

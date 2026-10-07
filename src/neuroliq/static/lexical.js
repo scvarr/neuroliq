@@ -102,7 +102,7 @@ async function openFamily(id, preserve = false) {
 async function decide(action) {
   const selected = [...document.querySelectorAll('.occurrence-pick:checked')].map(c => Number(c.value));
   const forms = [...document.querySelectorAll('.form-pick:checked')].map(c => c.value);
-  if (!$('reviewer').value.trim() || (action !== 'more' && !$('note').value.trim())) throw new Error('Укажите проверяющего и основание решения.');
+  if (!$('reviewer').value.trim()) throw new Error('Укажите проверяющего.');
   if (action === 'split' && !selected.length && !forms.length) throw new Error('Отметьте формы или примеры, которые нужно перенести.');
   const id = family.id;
   const checkedForms = forms, checkedExamples = selected;
