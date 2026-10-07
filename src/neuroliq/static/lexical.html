@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Neuroliq · Лексическое ревью</title><link rel="stylesheet" href="/static/lexical.css"></head>
+<body>
+<header><div><span class="eyebrow">NEUROLIQ / L0 BOOTSTRAP</span><h1>Лексическое ревью</h1></div><a href="/">Graph Lab ↗</a><button id="newBatch">Новый батч</button></header>
+<div id="message" role="status" aria-live="polite"></div>
+<main>
+<section id="setup" class="setup">
+<div><h2>От корпуса к проверяемым семьям</h2><p>Проверяйте одну гипотезу за раз. Решение применяется ко всей семье; исходные тексты и основания остаются доступными.</p><p class="warning">Принять семью — сохранить сопоставление с непрозрачным ID. Это не признание общего смысла, грамматической категории или найденного фактора L0.</p><h3>Продолжить сохранённый батч</h3><div id="saved"></div></div>
+<form id="batchForm"><h2>Подготовить батч</h2><label>Название<input id="title" required value="Русский корпус · первый батч" maxlength="200"></label><label>Источник<select id="source"><option value="dataset">Реальный корпус M6.3 · фиксированная validation</option><option value="local">Мои документы UTF-8</option></select></label><p id="datasetInfo">deepvk/cultura_ru_edu_llama3_annotations · revision 1082c2c8…<br>Скачивается фиксированный shard (~16 МБ). Первая обработка требует сети.</p><label id="filesLabel" hidden>Документы .txt (порядок по имени)<input id="files" type="file" accept=".txt" multiple></label><label>Лимит вхождений, включая пунктуацию<input id="limit" type="number" min="1" max="100000" value="10000" required></label><p>10 000 — стартовое значение эксперимента. Локальная API-граница этого стенда: до 100 000.</p><button type="submit" class="primary">Обработать и открыть ревью</button></form>
+</section>
+<section id="workspace" hidden>
+<div class="batchbar"><div><h2 id="batchTitle"></h2><p id="stats"></p></div><a id="export">Скачать результат и основания</a></div>
+<details class="rules"><summary>Как получены семьи и выбраны примеры</summary><p id="rule"></p><p>Сначала показаны представители каждой формы, затем других источников, затем редких локальных окружений. «Редкое» — сигнал для проверки, а не автоматический вывод об ошибке. Все остальные примеры доступны через «Показать ещё».</p></details>
+<div class="review-layout">
+<aside><label>Состояние<select id="statusFilter"><option value="pending">Ожидают решения</option><option value="all">Все семьи</option><option value="accepted">Приняты</option><option value="rejected">Отклонены</option></select></label><label>Найти форму<input id="search" type="search" placeholder="Например, школа"></label><label>Семья<select id="familySelect" size="12"></select></label><p id="queueStats"></p></aside>
+<article><div id="empty" hidden><h2>Нет семей в этой выборке</h2><p>Выберите «Все семьи» для аудита решений или обработайте другой батч. Негруппированные наблюдения сохранены в экспорте.</p></div>
+<div id="review"><div class="family-heading"><div><span id="familyKind" class="eyebrow"></span><h2 id="familyTitle"></h2><p id="familyStats"></p></div><span id="familyStatus" class="badge"></span></div><p id="lineage"></p>
+<div id="forms" class="forms"></div><p class="hint">Для разделения отметьте целые формы выше или конкретные примеры ниже. Они перейдут в новую ожидающую семью.</p>
+<div class="evidence-heading"><h3>Свидетельства из корпуса</h3><span id="exampleStats"></span></div><div id="examples" class="examples"></div><button id="more">Показать ещё 8 примеров</button>
+<div class="decision"><label>Проверяющий<input id="reviewer" value="Локальный исследователь" maxlength="200"></label><label>Основание решения<textarea id="note" rows="2" maxlength="4000" placeholder="Что подтверждено, какие различия замечены…"></textarea></label><div class="actions"><button id="accept" class="primary">Принять всю семью</button><button id="reject">Отклонить семью</button><button id="split">Разделить выбранное</button></div><p id="decisionHelp">Сопоставление относится только к этому батчу и его вхождениям.</p></div>
+<details id="history"><summary>Происхождение и решения</summary><div id="events"></div></details></div>
+</article></div>
+</section>
+</main>
+<dialog id="sourceDialog"><div class="dialog-heading"><h2>Исходный документ</h2><button id="closeSource">Закрыть</button></div><p id="sourceRef"></p><p id="sourceMeta"></p><pre id="sourceText"></pre></dialog>
+<script src="/static/lexical.js"></script>
+</body></html>

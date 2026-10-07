@@ -35,7 +35,7 @@ def graph_projection(graph: Graph, labels: Mapping[ConceptId, str]) -> dict:
     }
 
 
-def create_app(definition: ExperimentDefinition | None = None) -> FastAPI:
+def create_app(definition: ExperimentDefinition | None = None, *, workspace_path=None) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     static = Path(__file__).with_name("static")
     definition = ExperimentDefinition.from_json((definition or ExperimentDefinition.empty()).to_json())
@@ -98,6 +98,8 @@ def create_app(definition: ExperimentDefinition | None = None) -> FastAPI:
         return FileResponse(static / "index.html")
 
     app.mount("/static", StaticFiles(directory=static), name="static")
+    from .lexical_api import install_lexical_api
+    install_lexical_api(app, workspace_path)
     return app
 
 

@@ -3,3 +3,5 @@ services:
     build: .
     ports:
       - "127.0.0.1:${NEUROLIQ_PORT:-17890}:8000"
+    volumes:
+      - ./data:/lab/data
