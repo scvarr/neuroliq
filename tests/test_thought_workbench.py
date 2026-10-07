@@ -1,6 +1,7 @@
-"""CRUD, точный обмен, restart и границы ручного Workbench."""
+"""Общий граф и ordered routes: CRUD, restart, обмен и изоляция."""
 
 import json
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from uuid import UUID
@@ -12,7 +13,7 @@ from neuroliq.lexical_workspace import WorkspaceStore, build_workspace
 from neuroliq.thought_workbench import Concept, Snapshot, ThoughtStore
 from neuroliq.web import create_app
 
-BASE = "/api/thought-workbench"
+BASE = '/api/thought-workbench'
 
 
 def uid(n):
@@ -21,22 +22,19 @@ def uid(n):
 
 def document():
     return {
-        "format": "neuroliq.thought-workbench", "format_version": 1,
-        "concepts": [{"id": uid(1), "annotation": "ЧЕЛОВЕК"}, {"id": uid(2), "annotation": "ДАТЬ"}],
-        "sources": [{"id": uid(3), "text": "  И\u0306горь дал книгу Марии.\r\nОн устал.\t", "context": "Без нормализации\n{контекст}"}],
-        "thoughts": [{"id": uid(4), "source_id": uid(3), "annotation": "Передача",
-                      "elements": [
-                          {"id": uid(11), "kind": "concept", "concept_id": uid(1), "annotation": "Первый участник"},
-                          {"id": uid(12), "kind": "concept", "concept_id": uid(1), "annotation": "Другой участник"},
-                          {"id": uid(13), "kind": "concept", "concept_id": uid(2)},
-                          {"id": uid(14), "kind": "literal", "value": '  {"число":9007199254740993} «Игорь»\r\n\t\u0000'}],
-                      "links": [{"source": uid(13), "target": uid(11)}, {"source": uid(13), "target": uid(12)},
-                                {"source": uid(11), "target": uid(14)}, {"source": uid(12), "target": uid(13)}]}]
+        'format': 'neuroliq.thought-workbench', 'format_version': 2,
+        'concepts': [{'id': uid(1), 'annotation': 'HUMAN'}, {'id': uid(2), 'annotation': 'SEE'}],
+        'connections': [{'concept_a': uid(1), 'concept_b': uid(2)}],
+        'sources': [{'id': uid(3), 'text': '  И\u0306горь видит человека.\r\n\t', 'context': 'Без нормализации\n{заметки}\u0000'}],
+        'thoughts': [
+            {'id': uid(4), 'source_id': uid(3), 'annotation': 'Возврат к HUMAN', 'route': [uid(1), uid(2), uid(1)]},
+            {'id': uid(5), 'source_id': uid(3), 'annotation': 'Другой маршрут', 'route': [uid(2), uid(1)]},
+        ],
     }
 
 
-def test_crud_restart_and_exact_exchange(tmp_path):
-    path = tmp_path / "shared.sqlite3"
+def test_crud_restart_shared_graph_and_exact_exchange(tmp_path):
+    path = tmp_path / 'shared.db'
     with TestClient(create_app(workspace_path=path)) as client:
         assert client.get('/thought-workbench').status_code == 200
         for asset in ('thought-workbench.js', 'thought-workbench.css', 'vendor/cytoscape.min.js'):
@@ -44,39 +42,38 @@ def test_crud_restart_and_exact_exchange(tmp_path):
         for page in ('/', '/lexical', '/l0'):
             assert '/thought-workbench' in client.get(page).text
         doc = document()
-        for collection in ('concepts', 'sources', 'thoughts'):
+        for collection in ('concepts', 'connections', 'sources', 'thoughts'):
             for record in doc[collection]:
                 assert client.post(f'{BASE}/{collection}', json=record).status_code == 201
-        assert client.post(f'{BASE}/concepts', json=doc['concepts'][0]).status_code == 422
-        thought = client.get(BASE).json()['thoughts'][0]
-        assert thought['elements'][0]['concept_id'] == thought['elements'][1]['concept_id']
-        assert thought['elements'][0]['id'] != thought['elements'][1]['id']
-        assert sorted(thought['links'], key=lambda l: (l['source'], l['target'])) == sorted(doc['thoughts'][0]['links'], key=lambda l: (l['source'], l['target']))
-        assert thought['elements'][3]['value'] == doc['thoughts'][0]['elements'][3]['value']
-        assert client.get(BASE).json()['sources'] == doc['sources']
+        saved = client.get(BASE).json()
+        assert saved == doc
+        assert len(saved['concepts']) == 2 and len(saved['connections']) == 1
         for collection in ('concepts', 'sources', 'thoughts'):
-            record = client.get(BASE).json()[collection][0]
+            record = deepcopy(saved[collection][0])
             record['context' if collection == 'sources' else 'annotation'] = 'Изменение\r\n'
             assert client.put(f'{BASE}/{collection}/{record["id"]}', json=record).status_code == 200
         canonical = client.get(BASE + '/export').content
-        assert client.delete(f'{BASE}/concepts/{uid(1)}').status_code == 422
-        assert client.delete(f'{BASE}/sources/{uid(3)}').status_code == 422
-        assert client.get(BASE + '/export').content == canonical
+        for url in (f'/concepts/{uid(1)}', f'/sources/{uid(3)}', f'/connections/{uid(2)}/{uid(1)}'):
+            assert client.delete(BASE + url).status_code == 422
+            assert client.get(BASE + '/export').content == canonical
     with TestClient(create_app(workspace_path=path)) as restarted:
         assert restarted.get(BASE + '/export').content == canonical
+        assert next(t for t in restarted.get(BASE).json()['thoughts'] if t['id'] == uid(4))['route'] == [uid(1), uid(2), uid(1)]
         assert restarted.put(BASE, content=canonical).status_code == 200
         assert restarted.get(BASE + '/export').content == canonical
         reordered = json.loads(canonical)
-        reordered['concepts'].reverse()
-        reordered['thoughts'][0]['elements'].reverse()
-        reordered['thoughts'][0]['links'].reverse()
+        for collection in ('concepts', 'connections', 'sources', 'thoughts'):
+            reordered[collection].reverse()
+        c = reordered['connections'][0]
+        c['concept_a'], c['concept_b'] = c['concept_b'], c['concept_a']
         assert restarted.put(BASE, json=reordered).status_code == 200
         assert restarted.get(BASE + '/export').content == canonical
-        t = restarted.get(BASE).json()['thoughts'][0]
-        t['elements'] = [e for e in t['elements'] if e['id'] != uid(11)]
-        t['links'] = [l for l in t['links'] if uid(11) not in (l['source'], l['target'])]
-        assert restarted.put(f'{BASE}/thoughts/{t["id"]}', json=t).status_code == 200
-        for collection, ids in (('thoughts', [4]), ('sources', [3]), ('concepts', [1, 2])):
+        for n in (4, 5):
+            assert restarted.delete(f'{BASE}/thoughts/{uid(n)}').status_code == 200
+        assert restarted.delete(f'{BASE}/concepts/{uid(1)}').status_code == 422
+        assert restarted.delete(f'{BASE}/connections/{uid(2)}/{uid(1)}').status_code == 200
+        assert restarted.delete(f'{BASE}/connections/{uid(1)}/{uid(2)}').status_code == 404
+        for collection, ids in (('sources', [3]), ('concepts', [1, 2])):
             for n in ids:
                 assert restarted.delete(f'{BASE}/{collection}/{uid(n)}').status_code == 200
                 assert restarted.delete(f'{BASE}/{collection}/{uid(n)}').status_code == 404
@@ -87,36 +84,38 @@ def test_crud_restart_and_exact_exchange(tmp_path):
 
 
 @pytest.mark.parametrize('case', ['version', 'bool_version', 'missing_header', 'duplicate', 'uuid', 'source',
-                                'concept', 'endpoint', 'local_duplicate', 'link_duplicate', 'edge_type',
-                                'literal_concept', 'concept_value', 'missing_literal', 'numeric_literal', 'extra'])
+                                 'route_concept', 'endpoint', 'connection_duplicate', 'edge_type', 'strength',
+                                 'elements', 'literal', 'route_type', 'route_item', 'missing_connection', 'extra', 'surrogate'])
 def test_invalid_import_is_atomic(tmp_path, case):
     with TestClient(create_app(workspace_path=tmp_path / 'db')) as client:
         assert client.put(BASE, json=document()).status_code == 200
         before = client.get(BASE + '/export').content
         bad = deepcopy(document())
         t = bad['thoughts'][0]
-        if case == 'version': bad['format_version'] = 2
+        if case == 'version': bad['format_version'] = 1
         elif case == 'bool_version': bad['format_version'] = True
-        elif case == 'missing_header': del bad['format']
+        elif case == 'missing_header': del bad['connections']
         elif case == 'duplicate': bad['concepts'].append(bad['concepts'][0])
-        elif case == 'uuid': bad['concepts'][0]['id'] = 'ЧЕЛОВЕК'
+        elif case == 'uuid': bad['concepts'][0]['id'] = 'HUMAN'
         elif case == 'source': t['source_id'] = uid(99)
-        elif case == 'concept': t['elements'][0]['concept_id'] = uid(99)
-        elif case == 'endpoint': t['links'][0]['target'] = uid(99)
-        elif case == 'local_duplicate': t['elements'].append(t['elements'][0])
-        elif case == 'link_duplicate': t['links'].append(t['links'][0])
-        elif case == 'edge_type': t['links'][0]['type'] = 'SUBJECT_OF'
-        elif case == 'literal_concept': t['elements'][3]['concept_id'] = uid(1)
-        elif case == 'concept_value': t['elements'][0]['value'] = 'Игорь'
-        elif case == 'missing_literal': del t['elements'][3]['value']
-        elif case == 'numeric_literal': t['elements'][3]['value'] = 1
+        elif case == 'route_concept': t['route'][0] = uid(99)
+        elif case == 'endpoint': bad['connections'][0]['concept_b'] = uid(99)
+        elif case == 'connection_duplicate': bad['connections'].append({'concept_a': uid(2), 'concept_b': uid(1)})
+        elif case == 'edge_type': bad['connections'][0]['type'] = 'SUBJECT_OF'
+        elif case == 'strength': bad['connections'][0]['strength'] = 1
+        elif case == 'elements': t['elements'] = []
+        elif case == 'literal': t['route'][0] = {'value': 'Игорь'}
+        elif case == 'route_type': t['route'] = 'HUMAN'
+        elif case == 'route_item': t['route'][0] = 1
+        elif case == 'missing_connection': bad['connections'] = []
         elif case == 'extra': bad['runtime'] = {}
-        assert client.put(BASE, json=bad).status_code == 422
+        elif case == 'surrogate': bad['sources'][0]['text'] = '\ud800'
+        assert client.put(BASE, content=json.dumps(bad)).status_code == 422
         assert client.get(BASE + '/export').content == before
 
 
-@pytest.mark.parametrize('raw', ['{', '{}', '[]', '{"format_version":1,"format_version":2}',
-                              '{"x":NaN}', '{"x":Infinity}', b'\xff'])
+@pytest.mark.parametrize('raw', ['{', '{}', '[]', '{"format_version":2,"format_version":1}',
+                               '{"x":NaN}', '{"x":Infinity}', b'\xff'])
 def test_bad_json_is_atomic(tmp_path, raw):
     with TestClient(create_app(workspace_path=tmp_path / 'db')) as client:
         assert client.put(BASE, json=document()).status_code == 200
@@ -125,23 +124,70 @@ def test_bad_json_is_atomic(tmp_path, raw):
         assert client.get(BASE + '/export').content == before
 
 
+def test_route_order_not_sorted_and_repetition_not_deduplicated(tmp_path):
+    with TestClient(create_app(workspace_path=tmp_path / 'db')) as client:
+        assert client.put(BASE, json=document()).status_code == 200
+        before = client.get(BASE + '/export').content
+        t = document()['thoughts'][0]
+        t['route'] = [uid(2), uid(1), uid(2), uid(1)]
+        assert client.put(f'{BASE}/thoughts/{t["id"]}', json=t).status_code == 200
+        assert client.get(BASE).json()['thoughts'][-1]['route'] == t['route']
+        assert client.get(BASE + '/export').content != before
+        t['route'] = [uid(1)]
+        assert client.put(f'{BASE}/thoughts/{t["id"]}', json=t).status_code == 200
+        t['route'] = []
+        assert client.put(f'{BASE}/thoughts/{t["id"]}', json=t).status_code == 200
+        assert len(client.get(BASE).json()['concepts']) == 2
+
+
+def test_crud_rejection_and_annotations_preserve_topology(tmp_path):
+    with TestClient(create_app(workspace_path=tmp_path / 'db')) as client:
+        assert client.put(BASE, json=document()).status_code == 200
+        before = client.get(BASE + '/export').content
+        t = document()['thoughts'][0]
+        bad = {**t, 'id': uid(99)}
+        assert client.put(f'{BASE}/thoughts/{t["id"]}', json=bad).status_code == 422
+        assert client.put(f'{BASE}/thoughts/{bad["id"]}', json=bad).status_code == 404
+        assert client.post(BASE + '/sources', content='{').status_code == 422
+        assert client.post(BASE + '/connections', json={'concept_a':uid(2), 'concept_b':uid(1)}).status_code == 422
+        assert client.post(BASE + '/connections', json={'concept_a':uid(1), 'concept_b':uid(99)}).status_code == 422
+        assert client.get(BASE + '/export').content == before
+        concept = {**document()['concepts'][0], 'annotation': 'Произвольная подсказка'}
+        assert client.put(f'{BASE}/concepts/{concept["id"]}', json=concept).status_code == 200
+        state = client.get(BASE).json()
+        assert state['thoughts'] == document()['thoughts']
+        assert state['connections'] == document()['connections']
+
+
+def test_route_only_reference_blocks_deletion(tmp_path):
+    doc = document()
+    doc['connections'] = []
+    doc['thoughts'] = [{**doc['thoughts'][0], 'route': [uid(1)]}]
+    with TestClient(create_app(workspace_path=tmp_path / 'db')) as client:
+        assert client.put(BASE, json=doc).status_code == 200
+        assert client.delete(f'{BASE}/concepts/{uid(1)}').status_code == 422
+        assert client.delete(f'{BASE}/concepts/{uid(2)}').status_code == 200
+
+
 def test_isolation_and_transaction_rollback(tmp_path, monkeypatch):
     path = tmp_path / 'shared.db'
     lexical = WorkspaceStore(path)
     batch = build_workspace([('файл', 'школа школы урок')])
     lexical.create(batch)
-    with lexical.connect() as db:
-        tables = ['workspaces', 'l0_concepts', 'l0_connections', 'lexical_dictionary', 'corpus_cursors']
-        before = {table: db.execute(f'SELECT * FROM {table} ORDER BY rowid').fetchall() for table in tables}
+    tables = ['workspaces', 'l0_concepts', 'l0_connections', 'lexical_dictionary', 'corpus_cursors']
+    def other_state():
+        with lexical.connect() as db:
+            return {table: db.execute(f'SELECT * FROM {table} ORDER BY rowid').fetchall() for table in tables}
+    before = other_state()
     with TestClient(create_app(workspace_path=path)) as client:
         graph = client.get('/api/experiment').content
         activation = client.get('/api/activation').content
         assert client.put(BASE, json=document()).status_code == 200
+        assert client.put(BASE, content=client.get(BASE + '/export').content).status_code == 200
         assert client.get('/api/experiment').content == graph
         assert client.get('/api/activation').content == activation
         assert client.get('/api/lexical/' + batch['id'] + '/export').json()['workspace'] == batch
-    with lexical.connect() as db:
-        assert {table: db.execute(f'SELECT * FROM {table} ORDER BY rowid').fetchall() for table in tables} == before
+    assert other_state() == before
     store = ThoughtStore(path)
     saved = store.read().canonical()
     original = store._write
@@ -156,34 +202,35 @@ def test_isolation_and_transaction_rollback(tmp_path, monkeypatch):
     assert store.read().canonical() == saved
 
 
-def test_parallel_catalog_writes_and_local_scope(tmp_path):
+def test_parallel_catalog_writes(tmp_path):
     store = ThoughtStore(tmp_path / 'db')
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda n: store.mutate('concepts', uid(n), Concept(id=uid(n), annotation=str(n)), True), range(1, 101)))
     assert len(store.read().concepts) == 100
-    doc = document()
-    other = deepcopy(doc['thoughts'][0])
-    other['id'] = uid(5)
-    doc['thoughts'].append(other)
-    store.replace(Snapshot.model_validate(doc))
-    assert len(store.read().thoughts) == 2
 
 
-def test_crud_rejection_and_annotations_preserve_structure(tmp_path):
-    with TestClient(create_app(workspace_path=tmp_path / 'db')) as client:
-        assert client.put(BASE, json=document()).status_code == 200
-        before = client.get(BASE + '/export').content
-        t = client.get(BASE).json()['thoughts'][0]
-        bad = deepcopy(t)
-        bad['id'] = uid(99)
-        assert client.put(f'{BASE}/thoughts/{t["id"]}', json=bad).status_code == 422
-        assert client.put(f'{BASE}/thoughts/{bad["id"]}', json=bad).status_code == 404
-        bad = deepcopy(t)
-        bad['elements'] = bad['elements'][1:]
-        assert client.put(f'{BASE}/thoughts/{t["id"]}', json=bad).status_code == 422
-        assert client.post(BASE + '/sources', content='{').status_code == 422
-        assert client.get(BASE + '/export').content == before
-        concept = client.get(BASE).json()['concepts'][0]
-        concept['annotation'] = 'Произвольная новая подсказка'
-        assert client.put(f'{BASE}/concepts/{concept["id"]}', json=concept).status_code == 200
-        assert client.get(BASE).json()['thoughts'][0] == t
+def test_destructive_schema_replacement_is_scoped_and_one_time(tmp_path):
+    path = tmp_path / 'shared.db'
+    lexical = WorkspaceStore(path)
+    batch = build_workspace([('файл', 'школа школы')])
+    lexical.create(batch)
+    with sqlite3.connect(path) as db:
+        db.executescript('''
+            CREATE TABLE tw_concepts(id TEXT PRIMARY KEY, annotation TEXT);
+            CREATE TABLE tw_sources(id TEXT PRIMARY KEY, text TEXT, context TEXT);
+            CREATE TABLE tw_thoughts(id TEXT PRIMARY KEY, source_id TEXT REFERENCES tw_sources(id), annotation TEXT);
+            CREATE TABLE tw_elements(thought_id TEXT REFERENCES tw_thoughts(id), id TEXT, PRIMARY KEY(thought_id,id));
+            CREATE TABLE tw_links(thought_id TEXT, source TEXT, target TEXT, FOREIGN KEY(thought_id,source) REFERENCES tw_elements(thought_id,id));
+        ''')
+        db.execute('INSERT INTO tw_concepts VALUES (?,?)', (uid(1), 'Старый'))
+        db.execute('INSERT INTO tw_sources VALUES (?,?,?)', (uid(3), 'Старый', ''))
+        db.execute('INSERT INTO tw_thoughts VALUES (?,?,?)', (uid(4), uid(3), 'Старый'))
+        db.execute('INSERT INTO tw_elements VALUES (?,?)', (uid(4), uid(11)))
+        db.execute('INSERT INTO tw_links VALUES (?,?,?)', (uid(4), uid(11), uid(11)))
+    store = ThoughtStore(path)
+    assert store.read() == Snapshot()
+    with store.connect() as db:
+        assert {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'tw_%'")} == {'tw_concepts', 'tw_connections', 'tw_sources', 'tw_thoughts'}
+    store.replace(Snapshot.model_validate(document()))
+    assert ThoughtStore(path).read().canonical() == store.read().canonical()
+    assert lexical.load(batch['id']) == batch

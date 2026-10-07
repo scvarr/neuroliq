@@ -5,7 +5,7 @@
 <header><div><span class="eyebrow">NEUROLIQ / РУЧНЫЕ КОНСТРУКЦИИ</span><h1>Thought Workbench</h1></div><a href="/">Graph Lab ↗</a><a href="/l0">Постоянный L0 ↗</a><a href="/lexical">Лексическое ревью ↗</a></header>
 <div id="message" role="status" aria-live="polite"></div>
 <main>
-<p>Концепты и их подсказки создаёт исследователь. Стрелки задают только структуру конкретной мысли. Каждая успешная операция сразу сохраняется в SQLite.</p>
+<p>Один общий semantic graph: переиспользуемые ConceptId и нетипизированные связи без направления. Мысль сохраняет упорядоченный маршрут по этим ConceptId. Каждая успешная операция сразу сохраняется в SQLite.</p>
 <div class="exchange"><a href="/api/thought-workbench/export" download>Экспорт полного JSON</a><label>Импорт с заменой всего Workbench<input id="importFile" type="file" accept=".json,application/json"></label><button id="importButton">Импортировать snapshot</button></div>
 <p id="counts"></p>
 <div class="workbench-layout">
@@ -21,16 +21,17 @@
 <small id="sourceId"></small>
 </aside>
 <section>
+<h2>Общий semantic graph</h2>
+<div id="graph" aria-label="Общий граф ConceptId"></div><button id="fit">Вписать граф</button>
+<p>Серые линии — глобальные связи. Оранжевым выделен выбранный маршрут; номера на узлах и линиях показывают шаги и переходы. Направление задаёт маршрут ниже.</p>
+<form id="connectionForm"><h3>Глобальная связь</h3><div class="connection-pair"><label>Первый ConceptId<select id="connectionA"></select></label><label>Второй ConceptId<select id="connectionB"></select></label></div><button>Добавить общую связь</button><label>Сохранённая связь<select id="connectionList"></select></label><button type="button" id="deleteConnection">Удалить общую связь</button></form>
 <h2>Сохранённые мысли</h2>
 <label>Мысль<select id="thoughtList"></select></label>
 <form id="thoughtForm"><label>Подсказка мысли<input id="thoughtAnnotation"></label><label>Источник мысли<select id="thoughtSource"></select></label><button>Сохранить мысль</button><button type="button" id="newThought">Новая мысль</button><button type="button" id="deleteThought">Удалить мысль</button></form>
 <small id="thoughtId"></small><p id="thoughtEvidence"></p>
-<div id="graph" aria-label="Направленный граф мысли"></div><button id="fit">Вписать граф</button>
-<p>Выберите узел для редактирования. Для повторного участия концепта добавьте новый локальный элемент с тем же ConceptId.</p>
-<div class="construction">
-<form id="elementForm"><h3>Локальный элемент</h3><label>Элемент<select id="elementList"></select></label><label>Вид<select id="elementKind"><option value="concept">Reusable concept</option><option value="literal">Literal / текстовое значение</option></select></label><label id="conceptChoiceLabel">Концепт из каталога<select id="elementConcept"></select></label><label id="literalLabel" hidden>Значение (текст)<textarea id="elementValue" rows="2"></textarea></label><label>Локальная подсказка<textarea id="elementAnnotation" rows="2"></textarea></label><small id="elementId"></small><button>Сохранить элемент</button><button type="button" id="newElement">Новый элемент</button><button type="button" id="deleteElement">Удалить элемент и его связи</button></form>
-<form id="linkForm"><h3>Направленная связь</h3><label>Откуда<select id="linkSource"></select></label><label>Куда<select id="linkTarget"></select></label><button>Добавить стрелку</button><label>Сохранённая связь<select id="linkList" size="5"></select></label><button type="button" id="deleteLink">Удалить стрелку</button><p>Ветвление: добавьте несколько стрелок из одного элемента. Семантических типов связей нет.</p></form>
-</div>
+<h3>Упорядоченный маршрут выбранной мысли</h3><p id="routePath" aria-live="polite"></p>
+<form id="routeForm"><label>Добавить существующий ConceptId<select id="routeConcept"></select></label><button>Добавить шаг в конец маршрута</button><label>Шаг маршрута<select id="routeSteps" size="5"></select></label><button type="button" id="stepUp">Переместить шаг раньше</button><button type="button" id="stepDown">Переместить шаг позже</button><button type="button" id="deleteStep">Удалить шаг</button></form>
+<p>Один ConceptId можно добавить многократно. Соседние шаги требуют глобальной связи; при перестановке и удалении шага маршрут проверяется целиком. Annotations — только человеческие подсказки. Представление concrete scene/value остаётся открытым исследовательским вопросом.</p>
 </section>
 </div></main>
 <script src="/static/vendor/cytoscape.min.js"></script><script src="/static/thought-workbench.js"></script>

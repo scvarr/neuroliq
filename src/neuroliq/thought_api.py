@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, Response
 
-from .thought_workbench import Concept, Source, Thought, ThoughtStore, parse_snapshot
+from .thought_workbench import Concept, Connection, Source, Thought, ThoughtStore, parse_snapshot
 
 
 def install_thought_api(app, path=None):
@@ -70,6 +70,25 @@ def install_thought_api(app, path=None):
 
     for name, model in (("concepts", Concept), ("sources", Source), ("thoughts", Thought)):
         install_collection(name, model)
+
+    @router.post("/connections", status_code=201)
+    def create_connection(connection: Connection):
+        try:
+            key = (connection.concept_a, connection.concept_b)
+            return storage().mutate("connections", key, connection, True).model_dump(mode="json")
+        except (ValueError, TypeError) as error:
+            raise HTTPException(422, str(error)) from error
+
+    @router.delete("/connections/{concept_a}/{concept_b}")
+    def delete_connection(concept_a: str, concept_b: str):
+        try:
+            key = tuple(sorted((concept_a, concept_b)))
+            return storage().mutate("connections", key).model_dump(mode="json")
+        except KeyError as error:
+            raise HTTPException(404, str(error)) from error
+        except (ValueError, TypeError) as error:
+            raise HTTPException(422, str(error)) from error
+
     app.include_router(router)
 
     @app.get("/thought-workbench", include_in_schema=False)

@@ -1,4 +1,4 @@
-"""Ручные конструкции мыслей: отдельный контракт и атомарное SQLite-хранение."""
+"""Общий ручной граф ConceptId и упорядоченные маршруты мыслей."""
 
 import json
 import sqlite3
@@ -34,43 +34,20 @@ class Source(Identified):
     context: str = ""
 
 
-class Element(Identified):
-    kind: Literal["concept", "literal"]
-    concept_id: str | None = None
-    value: str | None = None
-    annotation: str = ""
+class Connection(Record):
+    concept_a: str
+    concept_b: str
 
     @model_validator(mode="after")
-    def variant(self):
-        if self.kind == "concept" and (self.concept_id is None or self.value is not None):
-            raise ValueError("Элемент concept требует concept_id и не содержит value")
-        if self.kind == "literal" and self.concept_id is not None:
-            raise ValueError("Элемент literal не содержит concept_id")
-        if self.kind == "literal" and self.value is None:
-            raise ValueError("Элемент literal требует текстовое value")
+    def canonical_pair(self):
+        self.concept_a, self.concept_b = sorted((self.concept_a, self.concept_b))
         return self
-
-
-class Link(Record):
-    source: str
-    target: str
 
 
 class Thought(Identified):
     source_id: str
     annotation: str = ""
-    elements: list[Element] = Field(default_factory=list)
-    links: list[Link] = Field(default_factory=list)
-
-    @model_validator(mode="after")
-    def local_structure(self):
-        ids = unique_ids(self.elements)
-        pairs = [(link.source, link.target) for link in self.links]
-        if len(set(pairs)) != len(pairs):
-            raise ValueError("Повторная directed link")
-        if any(a not in ids or b not in ids for a, b in pairs):
-            raise ValueError("Концы связи должны принадлежать этой мысли")
-        return self
+    route: list[str] = Field(default_factory=list)
 
 
 def unique_ids(records):
@@ -82,8 +59,9 @@ def unique_ids(records):
 
 class Snapshot(Record):
     format: Literal["neuroliq.thought-workbench"] = "neuroliq.thought-workbench"
-    format_version: Literal[1] = 1
+    format_version: Literal[2] = 2
     concepts: list[Concept] = Field(default_factory=list)
+    connections: list[Connection] = Field(default_factory=list)
     sources: list[Source] = Field(default_factory=list)
     thoughts: list[Thought] = Field(default_factory=list)
 
@@ -98,21 +76,28 @@ class Snapshot(Record):
     def references(self):
         concepts, sources = unique_ids(self.concepts), unique_ids(self.sources)
         unique_ids(self.thoughts)
+        pairs = {(c.concept_a, c.concept_b) for c in self.connections}
+        if len(pairs) != len(self.connections):
+            raise ValueError("Повторная глобальная связь")
+        if any(a not in concepts or b not in concepts for a, b in pairs):
+            raise ValueError("Концы глобальной связи должны существовать в каталоге")
         for thought in self.thoughts:
             if thought.source_id not in sources:
                 raise ValueError("Источник мысли отсутствует")
-            if any(e.kind == "concept" and e.concept_id not in concepts for e in thought.elements):
-                raise ValueError("Reusable concept отсутствует")
+            if any(concept_id not in concepts for concept_id in thought.route):
+                raise ValueError("ConceptId маршрута отсутствует в каталоге")
+            if any(tuple(sorted((a, b))) not in pairs for a, b in zip(thought.route, thought.route[1:])):
+                raise ValueError("Между соседними шагами маршрута отсутствует глобальная связь")
         return self
 
     def canonical(self):
         data = self.model_dump(mode="json")
         for name in ("concepts", "sources", "thoughts"):
             data[name].sort(key=lambda record: record["id"])
-        for thought in data["thoughts"]:
-            thought["elements"].sort(key=lambda record: record["id"])
-            thought["links"].sort(key=lambda link: (link["source"], link["target"]))
-        return json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n"
+        data["connections"].sort(key=lambda c: (c["concept_a"], c["concept_b"]))
+        result = json.dumps(data, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False) + "\n"
+        result.encode("utf-8")
+        return result
 
 
 def parse_snapshot(raw):
@@ -128,7 +113,7 @@ def parse_snapshot(raw):
         raise ValueError(f"Недопустимая константа JSON: {value}")
 
     data = json.loads(raw, object_pairs_hook=pairs, parse_constant=invalid_constant)
-    if not isinstance(data, dict) or not {"format", "format_version", "concepts", "sources", "thoughts"} <= data.keys():
+    if not isinstance(data, dict) or not {"format", "format_version", "concepts", "connections", "sources", "thoughts"} <= data.keys():
         raise ValueError("Требуется полный versioned snapshot")
     snapshot = Snapshot.model_validate(data)
     snapshot.canonical()
@@ -142,13 +127,21 @@ class ThoughtStore:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as db:
-            db.executescript("""
-                CREATE TABLE IF NOT EXISTS tw_concepts(id TEXT PRIMARY KEY, annotation TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS tw_sources(id TEXT PRIMARY KEY, text TEXT NOT NULL, context TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS tw_thoughts(id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES tw_sources(id), annotation TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS tw_elements(thought_id TEXT NOT NULL REFERENCES tw_thoughts(id), id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('concept','literal')), concept_id TEXT REFERENCES tw_concepts(id), value TEXT NOT NULL, annotation TEXT NOT NULL, PRIMARY KEY(thought_id,id));
-                CREATE TABLE IF NOT EXISTS tw_links(thought_id TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, PRIMARY KEY(thought_id,source,target), FOREIGN KEY(thought_id,source) REFERENCES tw_elements(thought_id,id), FOREIGN KEY(thought_id,target) REFERENCES tw_elements(thought_id,id));
-            """)
+            db.execute("BEGIN IMMEDIATE")
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(tw_thoughts)")}
+            if columns and "route" not in columns:
+                # Незамерженный прежний контракт заменяется без переноса данных.
+                for table in ("tw_links", "tw_elements", "tw_connections", "tw_thoughts", "tw_sources", "tw_concepts"):
+                    db.execute(f"DROP TABLE IF EXISTS {table}")
+            db.execute("CREATE TABLE IF NOT EXISTS tw_concepts(id TEXT PRIMARY KEY, annotation TEXT NOT NULL)")
+            db.execute("CREATE TABLE IF NOT EXISTS tw_sources(id TEXT PRIMARY KEY, text TEXT NOT NULL, context TEXT NOT NULL)")
+            db.execute("""CREATE TABLE IF NOT EXISTS tw_connections(
+                concept_a TEXT NOT NULL REFERENCES tw_concepts(id),
+                concept_b TEXT NOT NULL REFERENCES tw_concepts(id),
+                PRIMARY KEY(concept_a,concept_b), CHECK(concept_a <= concept_b))""")
+            db.execute("""CREATE TABLE IF NOT EXISTS tw_thoughts(
+                id TEXT PRIMARY KEY, source_id TEXT NOT NULL REFERENCES tw_sources(id),
+                annotation TEXT NOT NULL, route TEXT NOT NULL)""")
 
     @contextmanager
     def connect(self):
@@ -164,13 +157,9 @@ class ThoughtStore:
     def _read(self, db):
         thoughts = [dict(row) for row in db.execute("SELECT * FROM tw_thoughts")]
         for thought in thoughts:
-            thought["elements"] = []
-            for row in db.execute("SELECT id,kind,concept_id,value,annotation FROM tw_elements WHERE thought_id=?", (thought["id"],)):
-                element = dict(row)
-                element["value"] = json.loads(element["value"])
-                thought["elements"].append(element)
-            thought["links"] = [dict(row) for row in db.execute("SELECT source,target FROM tw_links WHERE thought_id=?", (thought["id"],))]
+            thought["route"] = json.loads(thought["route"])
         return Snapshot(concepts=[dict(row) for row in db.execute("SELECT * FROM tw_concepts")],
+                        connections=[dict(row) for row in db.execute("SELECT * FROM tw_connections")],
                         sources=[dict(row) for row in db.execute("SELECT * FROM tw_sources")], thoughts=thoughts)
 
     def read(self):
@@ -179,14 +168,13 @@ class ThoughtStore:
             return self._read(db)
 
     def _write(self, db, snapshot):
-        for table in ("tw_links", "tw_elements", "tw_thoughts", "tw_sources", "tw_concepts"):
+        for table in ("tw_thoughts", "tw_connections", "tw_sources", "tw_concepts"):
             db.execute(f"DELETE FROM {table}")
         db.executemany("INSERT INTO tw_concepts VALUES (?,?)", [(c.id, c.annotation) for c in snapshot.concepts])
         db.executemany("INSERT INTO tw_sources VALUES (?,?,?)", [(s.id, s.text, s.context) for s in snapshot.sources])
+        db.executemany("INSERT INTO tw_connections VALUES (?,?)", [(c.concept_a, c.concept_b) for c in snapshot.connections])
         for t in snapshot.thoughts:
-            db.execute("INSERT INTO tw_thoughts VALUES (?,?,?)", (t.id, t.source_id, t.annotation))
-            db.executemany("INSERT INTO tw_elements VALUES (?,?,?,?,?,?)", [(t.id, e.id, e.kind, e.concept_id, json.dumps(e.value, ensure_ascii=False, allow_nan=False), e.annotation) for e in t.elements])
-            db.executemany("INSERT INTO tw_links VALUES (?,?,?)", [(t.id, link.source, link.target) for link in t.links])
+            db.execute("INSERT INTO tw_thoughts VALUES (?,?,?,?)", (t.id, t.source_id, t.annotation, json.dumps(t.route)))
 
     def replace(self, snapshot):
         with self.connect() as db:
@@ -199,12 +187,14 @@ class ThoughtStore:
             db.execute("BEGIN IMMEDIATE")
             data = self._read(db).model_dump(mode="json")
             records = data[collection]
-            exists = any(r["id"] == record_id for r in records)
+            def key(r):
+                return (r["concept_a"], r["concept_b"]) if collection == "connections" else r["id"]
+            exists = any(key(r) == record_id for r in records)
             if create and exists:
                 raise ValueError("ID уже существует")
             if not create and not exists:
                 raise KeyError("Запись не найдена")
-            data[collection] = [r for r in records if r["id"] != record_id]
+            data[collection] = [r for r in records if key(r) != record_id]
             if record is not None:
                 data[collection].append(record.model_dump(mode="json"))
             snapshot = Snapshot.model_validate(data)
