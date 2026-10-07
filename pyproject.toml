@@ -12,6 +12,7 @@ dependencies = ["pydantic>=2.9,<3"]
 [project.optional-dependencies]
 test = ["pytest>=8.0", "httpx>=0.28"]
 web = ["fastapi>=0.116,<1", "uvicorn>=0.35,<1"]
+research = ["pyarrow>=17,<24"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
