@@ -1,5 +1,9 @@
 # Проверки Autonomous Prototype 01
 
+## P4 — память и композиционные наблюдения
+
+H3: один каталог переиспользуется четырьмя записями в обычной, вложенной belief и abstract областях; повторный origin сохраняет участника. `python -m pytest tests/test_autonomous_memory.py tests/test_autonomous_representation.py -q`: 10 passed, 0,04 s. Snapshot round-trip точен, ошибочный origin/цикл/принятие ambiguous отвергнуты. Две train-сцены порождают одну схему с count=2 и evidence support; это candidate, не выращенный концепт. Решение: P5 — ограниченная грамматика RU/EN без внешней модели.
+
 ## P3 — композиция и канонизация
 
 H3: сохраняются роли, повторные ссылки, одноимённость, value и вложенные области; alpha-переименование не меняет signature. Авторские конструкции и пять повреждённых вариантов; неизвестный участник и предел глубины. `python -m pytest tests/test_autonomous_comparison.py tests/test_autonomous_representation.py -q`: 9 passed, 0,07 s. Описаны узкая гарантия канонизации и непокрытые явления в FORMAT.md. Решение: сохранять эту модель в P4; универсальность и автоматическая индукция не доказаны.
