@@ -36,6 +36,8 @@
 
 ### Эксперименты и исторические результаты (experiment results)
 
+- [Autonomous Prototype 01: план](autonomous-prototype-01/PLAN.md), [состояние](autonomous-prototype-01/STATUS.md), [эксперименты](autonomous-prototype-01/EXPERIMENTS.md) — изолированный автономный цикл; [контракт](neuroliq-autonomous-research-contract.md) задаёт его границы.
+
 - [experiments.md](experiments.md) — контракт оформления проверяемого эксперимента; единственный список исторических отчётов — ниже.
 
 Семейство `m*-experiment.md` фиксирует контракты, исходные условия, диагностику, результаты и границы выводов конкретных экспериментов:
