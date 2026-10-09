@@ -1,5 +1,7 @@
 # Текущее состояние
 
+В ветке `research/autonomous-prototype-01` выполняется изолированный [автономный эксперимент](autonomous-prototype-01/PLAN.md). P0–P3 завершены: ограниченный обзор, сравнение трёх представлений, [ADR позиционной композиции](autonomous-prototype-01/adr/001-composition.md), валидируемые термы и alpha-канонизация. Это отдельный Python CLI-срез без изменения Graph/L0/Workbench; ручные контракты позиций не подтверждают смысл из нетипизированных связей или автоматическое выращивание основы. Текущее продолжение — [STATUS](autonomous-prototype-01/STATUS.md); формальная граница — [FORMAT](autonomous-prototype-01/FORMAT.md).
+
 Текущий исследовательский фокус — формальное внутреннее представление законченной мысли (Thought Program) после результатов L0/bootstrap. Реализованы постоянный нефакторизованный bootstrap-L0, внешний lexical dictionary, bounded lexical review workspace и отдельный persistent manual Thought Workbench. Roadmap M0–M8 не изменён; Workbench — ограниченный инструмент ручного исследования.
 
 ## Реализованная граница
