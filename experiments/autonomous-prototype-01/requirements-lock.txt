@@ -1,0 +1,13 @@
+# Окружение отдельного экспериментального CLI: Python 3.13.2.
+# Новых библиотек ядра нет; pydantic нужен существующему пакету neuroliq.
+setuptools==81.0.0
+pydantic==2.11.7
+pydantic_core==2.33.2
+typing_extensions==4.15.0
+annotated_types==0.7.0
+typing_inspection==0.4.2
+pytest==8.4.1
+iniconfig==2.3.0
+packaging==26.0
+pluggy==1.6.0
+colorama==0.4.6

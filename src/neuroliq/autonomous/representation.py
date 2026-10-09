@@ -86,6 +86,8 @@ def validate(scene, concepts=None):
             raise Invalid("Недопустимый адрес участника")
         if not isinstance(data, dict) or set(data) not in ({"concept", "value"}, {"concept", "value", "origin"}):
             raise Invalid("Недопустимое объявление участника")
+        if not isinstance(data["concept"], str):
+            raise Invalid("Адрес концепта должен быть строкой")
         concept = concepts.get(data["concept"])
         if concept is None or concept.positions or concept.result == "proposition":
             raise Invalid("Неизвестный или не предметный концепт участника")
@@ -111,6 +113,8 @@ def validate(scene, concepts=None):
             return concepts[entities[key]["concept"]].result
         if set(term) != {"concept", "args"} or not isinstance(term["args"], list):
             raise Invalid("Недопустимое применение")
+        if not isinstance(term["concept"], str):
+            raise Invalid("Адрес концепта должен быть строкой")
         concept = concepts.get(term["concept"])
         if concept is None or not concept.positions:
             raise Invalid("Неизвестный или неприменимый концепт")

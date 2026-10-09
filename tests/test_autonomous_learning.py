@@ -24,3 +24,5 @@ def test_training_does_not_modify_memory_and_default_is_fixed():
     assert navigator.search(query, policy=policy)["cost"]["entry"] == navigator.search(query)["cost"]["entry"]
     policy.fit(navigator, [task["query"] for task in tasks])
     assert dumps(memory.snapshot()) == snapshot
+    restored = Policy.restore(policy.snapshot())
+    assert restored.snapshot() == policy.snapshot()

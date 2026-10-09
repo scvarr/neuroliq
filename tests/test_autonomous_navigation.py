@@ -59,3 +59,9 @@ def test_extract_one_event_from_joint_scene():
     result = Navigator(data).search(Query("scene", cid("give")))
     assert len(result["results"]) == 1
     assert result["results"][0]["scene"]["root"]["concept"] == cid("past")
+    answer = result["results"][0]
+    focused = answer["scene"]["root"]
+    for position in answer["focus_path"]:
+        focused = focused["args"][position]
+    assert focused["concept"] == cid("give")
+    assert answer["source_path"] == [0, 0]

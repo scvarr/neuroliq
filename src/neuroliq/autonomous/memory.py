@@ -13,15 +13,25 @@ class Memory:
         self.concepts = catalog()
         self.contexts = {}
         self.records = {}
+        self.revision = 0
 
     def context(self, key, parent=None, mode="source"):
-        if not isinstance(key, str) or not key or key in self.contexts:
+        if not isinstance(key, str) or not key or len(key) > 256 or key in self.contexts:
             raise Invalid("Пустой или повторный контекст")
+        if parent is not None and not isinstance(parent, str):
+            raise Invalid("Недопустимый родитель контекста")
         if len(self.contexts) >= 1000 or (parent is not None and parent not in self.contexts):
             raise Invalid("Недопустимый родитель/бюджет контекста")
         if mode not in ("source", "belief", "hypothesis", "abstract"):
             raise Invalid("Неизвестный режим области")
+        current, depth = parent, 1
+        while current is not None:
+            depth += 1
+            if depth > 16:
+                raise Invalid("Исчерпан бюджет вложенности контекста")
+            current = self.contexts[current]["parent"]
         self.contexts[key] = {"parent": parent, "mode": mode}
+        self.revision += 1
 
     def add(self, key, context, scene, provenance, status="accepted", kind="observation", split="test"):
         if not isinstance(key, str) or not key or ":" in key or key in self.records:
@@ -54,8 +64,16 @@ class Memory:
                 target = self.records[address[0]]["scene"]["entities"].get(address[1])
                 if target is None or any(target[k] != declaration[k] for k in ("concept", "value")):
                     raise Invalid("Origin не соответствует участнику")
+                depth = 1
+                while "origin" in target:
+                    depth += 1
+                    if depth > 16:
+                        raise Invalid("Исчерпан бюджет цепочки origin")
+                    record_id, local = target["origin"].split(":")
+                    target = self.records[record_id]["scene"]["entities"][local]
         self.records[key] = deepcopy({"context": context, "scene": normalized, "provenance": provenance,
                                      "status": status, "kind": kind, "split": split})
+        self.revision += 1
         return normalized
 
     def visible(self, context, descendants=False):
@@ -113,6 +131,19 @@ class Memory:
             raise Invalid("Недопустимый snapshot")
         if data["version"] != 1 or data["concepts"] != json.loads(dumps(catalog_data(memory.concepts))):
             raise Invalid("Неподдерживаемый формат/каталог")
+        if not isinstance(data["contexts"], dict) or not isinstance(data["records"], dict):
+            raise Invalid("Контексты/записи должны быть объектами")
+        if len(data["contexts"]) > 1000 or len(data["records"]) > 1000:
+            raise Invalid("Исчерпан бюджет snapshot")
+        for context in data["contexts"].values():
+            if not isinstance(context, dict) or set(context) != {"parent", "mode"}:
+                raise Invalid("Недопустимая форма контекста")
+            if context["parent"] is not None and not isinstance(context["parent"], str):
+                raise Invalid("Недопустимый адрес родителя")
+        for record in data["records"].values():
+            if not isinstance(record, dict) or set(record) != {"context", "scene", "provenance", "status", "kind", "split"}:
+                raise Invalid("Недопустимая форма записи")
+            validate(record["scene"], memory.concepts)
         # Канонический JSON сортирует ключи: порядок родителей и origin восстанавливается явно.
         pending = dict(data["contexts"])
         while pending:

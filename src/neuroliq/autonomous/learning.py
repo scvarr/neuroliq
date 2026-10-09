@@ -6,7 +6,7 @@ from time import perf_counter
 
 from .memory import Memory, evidence
 from .navigation import Navigator, Query
-from .representation import apply, cid, entity, ref
+from .representation import Invalid, apply, cid, entity, ref
 
 NAMES = ("Мария", "Игорь", "Анна", "Олег", "Елена", "Борис")
 SEED = 101  # Генерация арифметическая: seed — версия детерминированного смещения.
@@ -26,6 +26,8 @@ class Policy:
         return min(features, key=lambda f: self.estimates.get(dimension(f), 1.0))
 
     def fit(self, navigator, queries):
+        if any(record["split"] != "train" for record in navigator.memory.records.values()):
+            raise Invalid("Обучение требует отдельной train-памяти")
         started = perf_counter()
         for query in queries:
             navigator.validate_query(query)
@@ -45,6 +47,28 @@ class Policy:
     def snapshot(self):
         return {"version": 1, "estimates": dict(self.estimates), "samples": dict(self.samples),
                 "probe_visits": self.probe_visits}
+
+    @classmethod
+    def restore(cls, data):
+        from math import isfinite
+        if not isinstance(data, dict) or set(data) != {"version", "estimates", "samples", "probe_visits"} or data["version"] != 1:
+            raise Invalid("Недопустимый формат политики")
+        if not isinstance(data["estimates"], dict) or not isinstance(data["samples"], dict):
+            raise Invalid("Недопустимые параметры политики")
+        if set(data["estimates"]) != set(data["samples"]):
+            raise Invalid("Параметры не имеют статистической поддержки")
+        for key, value in data["estimates"].items():
+            if not isinstance(key, str) or type(value) not in (int, float) or not isfinite(value) or not 0 <= value <= 1:
+                raise Invalid("Недопустимая оценка стоимости")
+            if type(data["samples"][key]) is not int or data["samples"][key] < 1:
+                raise Invalid("Недопустимое число наблюдений")
+        if type(data["probe_visits"]) is not int or data["probe_visits"] < 0:
+            raise Invalid("Недопустимая стоимость обучения")
+        policy = cls()
+        policy.estimates = dict(data["estimates"])
+        policy.samples = dict(data["samples"])
+        policy.probe_visits = data["probe_visits"]
+        return policy
 
 
 def wrappers(index):

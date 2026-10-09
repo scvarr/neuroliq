@@ -1,5 +1,11 @@
 # Проверки Autonomous Prototype 01
 
+## P9 — финальная интеграция и остановка
+
+11 gold-мыслей независимо от parser × RU/EN, сохранение/загрузка новым объектом, формальный запрос/подконструкция/RU+EN ответ, общая сцена, unknown/proposed/abstract/belief, origin, отказ бюджета и экспорт. `python -m neuroliq.autonomous run --output experiments/autonomous-prototype-01/final`: 75/75 групповых проверок; 17 demo записей. Успешный отказ Python не означает переноса операционной семантики. Данные — 983 записи ниже лимита. CPU 0,094 s, wall 0,099 s, peak RSS 25,5 MiB, GPU/download=0. JSON результаты и трассы — final/.
+
+Regression с явным UTF-8: 279 passed, 4,15 s. Без параметра один существующий M6.0 CLI тест падает по CP1251/UTF-8; модуль не изменён. CLI query с сохранённой learned policy вернула 3 полных ответа без LLM. Итог — REPORT.md. Главная гипотеза выращивания не подтверждена; shift ухудшает visits 6→41, Python-проба отрицательная. Решение: остановиться по 12.4.1/4 после финального commit/push.
+
 ## P8 — токенная обратимость и экспорт
 
 H3 в части сериализации: вложенность, local refs, values, Unicode/числа/bool/null, контекстная цепочка и origin восстанавливаются точно. `python -m pytest tests/test_autonomous_tokens.py -q`: 8 passed, 0,04 s; шесть повреждённых frames отвергнуты. `python -m neuroliq.autonomous.tokens --output experiments/autonomous-prototype-01/export`: 18 строк, train/validation/test по 6, roundtrip_failures=0, vocabulary_version=1. Экспорт содержит source/provenance отдельно от формальной токенной цели и generated RU/EN; независимого human acceptance нет. Сохранены vocabulary.json, corpus.jsonl, memory.json, summary.json. Обучение Transformer отсутствует. Решение: P9 — интеграция, независимые от parser gold-пары и отрицательная Python-проба.

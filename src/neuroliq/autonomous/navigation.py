@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from time import perf_counter
 
-from .representation import Invalid, canonical, cid, ref
+from .representation import Invalid, canonical, cid, scalar
 
 UNARY = {cid(key) for key in ("past", "not", "possible")}
 
@@ -34,6 +34,7 @@ class Budget:
 class Navigator:
     def __init__(self, memory):
         self.memory = memory
+        self.revision = memory.revision
         self.events, self.postings = {}, {}
         started = perf_counter()
         self.build_nodes = 0
@@ -76,6 +77,8 @@ class Navigator:
         return result
 
     def validate_query(self, query):
+        if self.memory.revision != self.revision:
+            raise Invalid("Память изменилась: требуется перестроить навигатор")
         self.memory.visible(query.context, query.descendants)
         concept = self.memory.concepts.get(query.predicate)
         if concept is None or concept.result != "proposition":
@@ -88,6 +91,7 @@ class Navigator:
             if not constraints or not set(constraints) <= {"concept", "value", "origin"}:
                 raise Invalid("Недопустимые ограничения роли")
             for value in constraints.values():
+                scalar(value)
                 if value is None or type(value) not in (str, int, float, bool):
                     raise Invalid("Неизвестное значение не является селектором факта")
 
@@ -142,7 +146,8 @@ class Navigator:
         scene = canonical({"entities": {key: record["scene"]["entities"][key] for key in used}, "root": root})
         return {"scene": scene, "context": record["context"], "provenance": record["provenance"],
                 "status": record["status"], "kind": record["kind"], "embedded": embedded,
-                "focus_path": list(event["path"])}
+                "source_path": list(event["path"]),
+                "focus_path": list(event["path"]) if embedded else [0] * len(event["wrappers"])}
 
     def search(self, query, budget=None, full_scan=False, policy=None):
         self.validate_query(query)
