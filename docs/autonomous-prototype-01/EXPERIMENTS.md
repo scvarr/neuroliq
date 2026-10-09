@@ -1,5 +1,9 @@
 # Проверки Autonomous Prototype 01
 
+## P5 — RU/EN и обратное выражение
+
+H3: десять RU/EN пар с передачей/получением, новым сочетанием ключ/Олег/Елена, отрицанием, возможностью, убеждением, условием, reflexive и неизвестным получателем имеют одинаковую semantic signature. Обратный parse(render) в двух языках сохраняет её. Четыре неподдерживаемых/неоднозначных фразы отвергнуты; явный context binding сохраняет origin. Обнаружена техническая ошибка приоритета regex: положительная передача поглощала `не` в имя; исправлена порядком правил, без изменения гипотезы. Итог `python -m pytest tests/test_autonomous_language.py tests/test_autonomous_memory.py tests/test_autonomous_representation.py tests/test_autonomous_comparison.py -q`: 26 passed. Ни LLM, ни внешние корпуса не использовались. Это контролируемый язык, не универсальный RU/EN переводчик. Решение: перейти к P6.
+
 ## P4 — память и композиционные наблюдения
 
 H3: один каталог переиспользуется четырьмя записями в обычной, вложенной belief и abstract областях; повторный origin сохраняет участника. `python -m pytest tests/test_autonomous_memory.py tests/test_autonomous_representation.py -q`: 10 passed, 0,04 s. Snapshot round-trip точен, ошибочный origin/цикл/принятие ambiguous отвергнуты. Две train-сцены порождают одну схему с count=2 и evidence support; это candidate, не выращенный концепт. Решение: P5 — ограниченная грамматика RU/EN без внешней модели.
