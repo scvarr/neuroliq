@@ -38,6 +38,7 @@
 
 - [Autonomous Prototype 01: план](autonomous-prototype-01/PLAN.md), [состояние](autonomous-prototype-01/STATUS.md), [эксперименты](autonomous-prototype-01/EXPERIMENTS.md) — изолированный автономный цикл; [контракт](neuroliq-autonomous-research-contract.md) задаёт его границы.
 - [Обзор Autonomous Prototype 01](autonomous-prototype-01/RESEARCH.md) — источники, конкурирующие гипотезы, контрпримеры и условия данных.
+- [ADR композиции прототипа](autonomous-prototype-01/adr/001-composition.md) — изолированный позиционный примитив, основания и границы выбора.
 
 - [experiments.md](experiments.md) — контракт оформления проверяемого эксперимента; единственный список исторических отчётов — ниже.
 

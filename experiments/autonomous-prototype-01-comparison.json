@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "data": "��������� ����������� ������������ v1",
+  "results": {
+    "adjacency": {
+      "roles": false,
+      "references": false,
+      "values": false,
+      "same_name": false,
+      "scope": true,
+      "modifiers": true,
+      "belief": true
+    },
+    "route": {
+      "roles": false,
+      "references": false,
+      "values": false,
+      "same_name": false,
+      "scope": false,
+      "modifiers": true,
+      "belief": true
+    },
+    "composition": {
+      "roles": true,
+      "references": true,
+      "values": true,
+      "same_name": true,
+      "scope": true,
+      "modifiers": true,
+      "belief": true
+    }
+  }
+}
