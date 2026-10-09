@@ -40,6 +40,7 @@
 - [Обзор Autonomous Prototype 01](autonomous-prototype-01/RESEARCH.md) — источники, конкурирующие гипотезы, контрпримеры и условия данных.
 - [ADR композиции прототипа](autonomous-prototype-01/adr/001-composition.md) — изолированный позиционный примитив, основания и границы выбора.
 - [Формат прототипа](autonomous-prototype-01/FORMAT.md) — композиция, локальные ссылки и точная гарантия канонизации.
+- [ADR навигации прототипа](autonomous-prototype-01/adr/002-navigation.md) — структурный обход, scope, trace и бюджеты.
 
 - [experiments.md](experiments.md) — контракт оформления проверяемого эксперимента; единственный список исторических отчётов — ниже.
 
