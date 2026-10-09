@@ -1,5 +1,9 @@
 # Проверки Autonomous Prototype 01
 
+## P8 — токенная обратимость и экспорт
+
+H3 в части сериализации: вложенность, local refs, values, Unicode/числа/bool/null, контекстная цепочка и origin восстанавливаются точно. `python -m pytest tests/test_autonomous_tokens.py -q`: 8 passed, 0,04 s; шесть повреждённых frames отвергнуты. `python -m neuroliq.autonomous.tokens --output experiments/autonomous-prototype-01/export`: 18 строк, train/validation/test по 6, roundtrip_failures=0, vocabulary_version=1. Экспорт содержит source/provenance отдельно от формальной токенной цели и generated RU/EN; независимого human acceptance нет. Сохранены vocabulary.json, corpus.jsonl, memory.json, summary.json. Обучение Transformer отсутствует. Решение: P9 — интеграция, независимые от parser gold-пары и отрицательная Python-проба.
+
 ## P7 — адаптация структурного входа
 
 H4, арифметический генератор v1/seed=101; 6 train, 6 validation, 6 test целевых сцен, разные пары участников/item/wrappers, нулевое пересечение целевых композиций. Train-память (54 записи) полностью отделена от test. Один проход по train-запросам, 210 фактических посещений проб; средние доли кандидатов обучились: predicate=0,55556, role0/value=0,09259 (6 наблюдений каждой). Ни одного test значения стоимости при обучении/выборе входа. Неизменность memory snapshot проверена.
